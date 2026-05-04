@@ -225,7 +225,7 @@ def build_aggregates(df):
             })
     print(f"[Agg] brand_region_daily: {len(brand_region_daily)} entrées")
 
-        return {
+    return {
         "meta": {
             "generated":     datetime.date.today().isoformat(),
             "n_stations":    int(all_data["provider_id"].nunique()) if "provider_id" in all_data else len(latest),
