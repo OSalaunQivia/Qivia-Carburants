@@ -134,6 +134,7 @@ def safe_mean(s):
 
 def build_aggregates(df):
     files = sorted(glob.glob(os.path.join(CSV_DIR, "stations_avec_prix_*.csv")))
+    print(f"[Agg] {len(files)} fichier(s) CSV trouvé(s) dans {CSV_DIR}/")
     if files:
         dfs = []
         for f in files:
@@ -141,10 +142,17 @@ def build_aggregates(df):
             try:
                 tmp = pd.read_csv(f, low_memory=False)
                 tmp["snapshot_date"] = pd.to_datetime(date_str, format="mixed")
+                # Harmoniser les colonnes des anciens CSV (format PostgreSQL)
+                if "uuid" in tmp.columns and "provider_id" not in tmp.columns:
+                    tmp = tmp.rename(columns={"uuid": "provider_id"})
+                if "name" in tmp.columns and "address" not in tmp.columns:
+                    tmp["address"] = tmp["name"]
                 dfs.append(tmp)
+                print(f"  ✓ {os.path.basename(f)} ({len(tmp)} lignes)")
             except Exception as e:
                 print(f"  ✗ {f}: {e}")
         all_data = pd.concat(dfs, ignore_index=True) if dfs else df.copy()
+        print(f"[Agg] Total : {len(all_data)} lignes, {len(dfs)} snapshots")
     else:
         all_data = df.copy()
         all_data["snapshot_date"] = pd.to_datetime(all_data["snapshot_date"])
