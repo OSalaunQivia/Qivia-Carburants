@@ -1,25 +1,45 @@
 """
-fetch_and_build.py
-==================
-Récupère les prix depuis l'API gouvernementale,
-sauvegarde le CSV dans csv/ et génère qivia_data.json
+fetch_and_build.py — QIVIA
+Récupère les prix + région + département depuis l'API gouvernementale
+et extrait la marque depuis le nom de la station.
 """
 
-import json, os, time, datetime, requests, pandas as pd, glob
+import json, os, time, datetime, requests, pandas as pd, glob, re
 
 API_URL = (
     "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets"
     "/prix-des-carburants-en-france-flux-instantane-v2/records"
 )
 API_FIELDS = [
-    "id","adresse","cp","ville",
+    "id","adresse","cp","ville","region","departement",
     "gazole_prix","gazole_maj","sp95_prix","sp95_maj",
     "e10_prix","e10_maj","sp98_prix","sp98_maj",
     "e85_prix","e85_maj","gplc_prix","gplc_maj",
+    "services_service","carburants_disponibles",
 ]
 FUELS      = ["gazole_prix","sp95_prix","e10_prix","sp98_prix","e85_prix","gplc_prix"]
 TOP_BRANDS = 12
 CSV_DIR    = "csv"
+
+# Marques connues à détecter dans le nom de la station
+KNOWN_BRANDS = [
+    "Total","TotalEnergies","Esso","BP","Shell","Avia","Leclerc","Intermarché",
+    "Carrefour","Super U","Système U","Auchan","Casino","Géant","Netto",
+    "Dyneff","Eni","Agip","Petit Casino","Vito","Elyrion","Prom'oil",
+]
+
+def detect_brand(name):
+    if not name: return "Autre"
+    name_upper = name.upper()
+    for brand in KNOWN_BRANDS:
+        if brand.upper() in name_upper:
+            # Normaliser quelques variantes
+            if brand in ["TotalEnergies"]: return "Total"
+            if brand in ["Système U","Super U"]: return "Super U"
+            if brand in ["Agip"]: return "Eni/Agip"
+            if brand in ["Géant","Casino","Petit Casino"]: return "Casino"
+            return brand
+    return "Autre"
 
 
 def fetch_api():
@@ -51,7 +71,16 @@ def build_dataframe(rows):
     for f in FUELS:
         if f in df.columns:
             df[f] = pd.to_numeric(df[f], errors="coerce")
-    df = df.rename(columns={"id":"provider_id","adresse":"address","cp":"postal","ville":"city"})
+    df = df.rename(columns={
+        "id":        "provider_id",
+        "adresse":   "address",
+        "cp":        "postal",
+        "ville":     "city",
+        "departement": "department",
+    })
+    # Extraire la marque depuis le nom de la station
+    df["brand"] = df["address"].apply(detect_brand)
+    df["name"]  = df["address"]
     df["snapshot_date"] = datetime.date.today().isoformat()
     return df
 
@@ -62,6 +91,11 @@ def save_csv(df):
     path  = os.path.join(CSV_DIR, f"stations_avec_prix_{today}.csv")
     df.to_csv(path, index=False)
     print(f"[CSV] {path} ({len(df)} lignes)")
+    # Stats marques
+    print("[CSV] Top marques:", df["brand"].value_counts().head(5).to_dict())
+    # Stats régions
+    if "region" in df.columns:
+        print("[CSV] Régions:", df["region"].nunique(), "régions")
     return path
 
 
@@ -80,7 +114,8 @@ def build_aggregates(df):
                 tmp = pd.read_csv(f, low_memory=False)
                 tmp["snapshot_date"] = pd.to_datetime(date_str, format="mixed")
                 dfs.append(tmp)
-            except: pass
+            except Exception as e:
+                print(f"  ✗ {f}: {e}")
         all_data = pd.concat(dfs, ignore_index=True) if dfs else df.copy()
     else:
         all_data = df.copy()
@@ -115,13 +150,13 @@ def build_aggregates(df):
     regional_daily = []
     if reg_col:
         for (dt,region),g in all_data.groupby(["snapshot_date",reg_col]):
-            regional_daily.append({"date":str(dt.date()),"region":region,**fr(g)})
+            regional_daily.append({"date":str(dt.date()),"region":str(region),**fr(g)})
 
     brand_daily, top_brands = [], []
     if brand_col:
         top_brands = all_data[brand_col].value_counts().head(TOP_BRANDS).index.tolist()
         for (dt,brand),g in all_data[all_data[brand_col].isin(top_brands)].groupby(["snapshot_date",brand_col]):
-            brand_daily.append({"date":str(dt.date()),"brand":brand,**fr(g)})
+            brand_daily.append({"date":str(dt.date()),"brand":str(brand),**fr(g)})
 
     latest = all_data[all_data["snapshot_date"]==dates_sorted[-1]]
     stations = []
@@ -129,7 +164,7 @@ def build_aggregates(df):
         if all(pd.isna(r.get(f)) for f in FUELS): continue
         stations.append({
             "uuid":   str(r.get("provider_id","")),
-            "name":   str(r.get("address",""))[:50],
+            "name":   str(r.get("name",r.get("address","")))[:50],
             "city":   str(r.get("city","")),
             "region": str(r.get("region","")),
             "brand":  str(r.get("brand","")),
@@ -148,7 +183,7 @@ def build_aggregates(df):
             "quarters":      sorted(all_data["quarter"].unique().tolist()),
             "halves":        sorted(all_data["half"].unique().tolist()),
             "years":         sorted([int(y) for y in all_data["year"].unique().tolist()]),
-            "regions":       sorted(all_data[reg_col].dropna().unique().tolist()) if reg_col else [],
+            "regions":       sorted([str(r) for r in all_data[reg_col].dropna().unique()]) if reg_col else [],
             "brands":        top_brands,
         },
         "daily":daily,"weekly":weekly,"monthly":monthly,
@@ -163,8 +198,8 @@ def main():
     print(f"  {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*55}\n")
 
-    rows     = fetch_api()
-    df       = build_dataframe(rows)
+    rows = fetch_api()
+    df   = build_dataframe(rows)
     save_csv(df)
 
     print("[JSON] Calcul des agrégats…")
@@ -172,7 +207,9 @@ def main():
     with open("qivia_data.json","w",encoding="utf-8") as fp:
         json.dump(data, fp, ensure_ascii=False, separators=(",",":"))
     print(f"[JSON] qivia_data.json ({os.path.getsize('qivia_data.json')//1024} Ko)")
-    print(f"\n[OK] Terminé — {data['meta']['n_snapshots']} snapshots, {data['meta']['n_stations']} stations\n")
+    print(f"\n[OK] Terminé — {data['meta']['n_snapshots']} snapshots")
+    print(f"     Régions  : {data['meta']['regions'][:3]}…")
+    print(f"     Marques  : {data['meta']['brands'][:5]}\n")
 
 
 if __name__ == "__main__":
