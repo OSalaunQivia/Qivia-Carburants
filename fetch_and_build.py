@@ -1,16 +1,11 @@
 """
 fetch_and_build.py
 ==================
-Script lancé chaque nuit par GitHub Actions.
+Récupère les prix depuis l'API gouvernementale,
+sauvegarde le CSV dans csv/ et génère qivia_data.json
 """
 
-import json
-import os
-import sys
-import time
-import datetime
-import requests
-import pandas as pd
+import json, os, time, datetime, requests, pandas as pd, glob
 
 API_URL = (
     "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets"
@@ -18,38 +13,33 @@ API_URL = (
 )
 API_FIELDS = [
     "id","adresse","cp","ville",
-    "gazole_prix","gazole_maj",
-    "sp95_prix","sp95_maj",
-    "e10_prix","e10_maj",
-    "sp98_prix","sp98_maj",
-    "e85_prix","e85_maj",
-    "gplc_prix","gplc_maj",
+    "gazole_prix","gazole_maj","sp95_prix","sp95_maj",
+    "e10_prix","e10_maj","sp98_prix","sp98_maj",
+    "e85_prix","e85_maj","gplc_prix","gplc_maj",
 ]
 FUELS      = ["gazole_prix","sp95_prix","e10_prix","sp98_prix","e85_prix","gplc_prix"]
-LIMIT      = 100
 TOP_BRANDS = 12
-OUTPUT_DIR = "."
+CSV_DIR    = "csv"
 
 
 def fetch_api():
     rows, offset = [], 0
     print("[API] Récupération des données…")
     while True:
-        params = {"select": ",".join(API_FIELDS), "limit": LIMIT, "offset": offset}
+        params = {"select": ",".join(API_FIELDS), "limit": 100, "offset": offset}
         for attempt in range(3):
             try:
                 r = requests.get(API_URL, params=params, timeout=30)
                 r.raise_for_status()
                 break
-            except Exception as e:
+            except:
                 if attempt == 2: raise
                 time.sleep(3)
         batch = r.json().get("results", [])
         if not batch: break
         rows.extend(batch)
-        offset += LIMIT
-        if offset % 1000 == 0:
-            print(f"  {offset} stations…")
+        offset += 100
+        if offset % 1000 == 0: print(f"  {offset} stations…")
     print(f"[API] {len(rows)} stations récupérées")
     return rows
 
@@ -67,58 +57,12 @@ def build_dataframe(rows):
 
 
 def save_csv(df):
+    os.makedirs(CSV_DIR, exist_ok=True)
     today = datetime.date.today().strftime("%Y-%m-%d")
-    path  = os.path.join(OUTPUT_DIR, f"stations_avec_prix_{today}.csv")
+    path  = os.path.join(CSV_DIR, f"stations_avec_prix_{today}.csv")
     df.to_csv(path, index=False)
     print(f"[CSV] {path} ({len(df)} lignes)")
     return path
-
-
-def upload_to_gdrive(file_path):
-    creds_json = os.environ.get("GDRIVE_CREDENTIALS")
-    folder_id  = os.environ.get("GDRIVE_FOLDER_ID")
-    if not creds_json or not folder_id:
-        print("[Drive] Variables manquantes — upload ignoré")
-        return
-    try:
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaFileUpload
-
-        creds = service_account.Credentials.from_service_account_info(
-            json.loads(creds_json),
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
-        service  = build("drive", "v3", credentials=creds)
-        filename = os.path.basename(file_path)
-
-        # Chercher si fichier existe déjà (dans Shared Drive aussi)
-        existing = service.files().list(
-            q=f"name='{filename}' and '{folder_id}' in parents and trashed=false",
-            fields="files(id,name)",
-            includeItemsFromAllDrives=True,
-            supportsAllDrives=True
-        ).execute().get("files", [])
-
-        media = MediaFileUpload(file_path, mimetype="text/csv")
-
-        if existing:
-            service.files().update(
-                fileId=existing[0]["id"],
-                media_body=media,
-                supportsAllDrives=True
-            ).execute()
-            print(f"[Drive] {filename} mis à jour ✓")
-        else:
-            service.files().create(
-                body={"name": filename, "parents": [folder_id]},
-                media_body=media,
-                supportsAllDrives=True
-            ).execute()
-            print(f"[Drive] {filename} uploadé ✓")
-
-    except Exception as e:
-        print(f"[Drive] Erreur : {e}")
 
 
 def safe_mean(s):
@@ -127,8 +71,7 @@ def safe_mean(s):
 
 
 def build_aggregates(df):
-    import glob
-    files = sorted(glob.glob(os.path.join(OUTPUT_DIR, "stations_avec_prix_*.csv")))
+    files = sorted(glob.glob(os.path.join(CSV_DIR, "stations_avec_prix_*.csv")))
     if files:
         dfs = []
         for f in files:
@@ -150,17 +93,17 @@ def build_aggregates(df):
     all_data["half"]       = all_data["snapshot_date"].apply(
         lambda d: f"{d.year}-H{'1' if d.month<=6 else '2'}"
     )
-
     dates_sorted = sorted(all_data["snapshot_date"].unique())
 
     def fr(g):
         return {f: safe_mean(g[f]) for f in FUELS if f in g.columns}
 
-    daily       = [{"date": str(dt.date()), **fr(g)} for dt, g in all_data.groupby("snapshot_date")]
+    daily       = [{"date":str(dt.date()),**fr(g)} for dt,g in all_data.groupby("snapshot_date")]
     weekly      = []
-    for (ym,wk), g in all_data.groupby(["year_month","week"]):
+    for (ym,wk),g in all_data.groupby(["year_month","week"]):
         di = sorted(g["snapshot_date"].dt.date.unique())
-        weekly.append({"period":f"S{wk}","year_month":ym,"week":int(wk),"date_min":str(di[0]),"date_max":str(di[-1]),**fr(g)})
+        weekly.append({"period":f"S{wk}","year_month":ym,"week":int(wk),
+                       "date_min":str(di[0]),"date_max":str(di[-1]),**fr(g)})
     monthly     = [{"period":ym,**fr(g)} for ym,g in all_data.groupby("year_month")]
     quarterly   = [{"period":q,**fr(g)}  for q,g  in all_data.groupby("quarter")]
     half_yearly = [{"period":h,**fr(g)}  for h,g  in all_data.groupby("half")]
@@ -208,9 +151,9 @@ def build_aggregates(df):
             "regions":       sorted(all_data[reg_col].dropna().unique().tolist()) if reg_col else [],
             "brands":        top_brands,
         },
-        "daily": daily, "weekly": weekly, "monthly": monthly,
-        "quarterly": quarterly, "half_yearly": half_yearly, "yearly": yearly,
-        "regional_daily": regional_daily, "brand_daily": brand_daily, "stations": stations,
+        "daily":daily,"weekly":weekly,"monthly":monthly,
+        "quarterly":quarterly,"half_yearly":half_yearly,"yearly":yearly,
+        "regional_daily":regional_daily,"brand_daily":brand_daily,"stations":stations,
     }
 
 
@@ -222,15 +165,13 @@ def main():
 
     rows     = fetch_api()
     df       = build_dataframe(rows)
-    csv_path = save_csv(df)
-    upload_to_gdrive(csv_path)
+    save_csv(df)
 
     print("[JSON] Calcul des agrégats…")
-    data      = build_aggregates(df)
-    json_path = os.path.join(OUTPUT_DIR, "qivia_data.json")
-    with open(json_path, "w", encoding="utf-8") as fp:
+    data = build_aggregates(df)
+    with open("qivia_data.json","w",encoding="utf-8") as fp:
         json.dump(data, fp, ensure_ascii=False, separators=(",",":"))
-    print(f"[JSON] {json_path} ({os.path.getsize(json_path)//1024} Ko)")
+    print(f"[JSON] qivia_data.json ({os.path.getsize('qivia_data.json')//1024} Ko)")
     print(f"\n[OK] Terminé — {data['meta']['n_snapshots']} snapshots, {data['meta']['n_stations']} stations\n")
 
 
