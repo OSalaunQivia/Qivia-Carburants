@@ -2,44 +2,35 @@ name: Qivia — Mise à jour quotidienne
 
 on:
   schedule:
-    - cron: '1 0 * * *'   # tous les jours à 00h01 UTC
-  workflow_dispatch:        # permet aussi de lancer manuellement depuis GitHub
+    - cron: '1 0 * * *'
+  workflow_dispatch:
 
 permissions:
-  contents: write           # nécessaire pour pousser qivia_data.json
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Récupérer le code du dépôt
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Installer Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # 3. Installer les dépendances
       - name: Install dependencies
-        run: |
-          pip install requests pandas google-auth google-auth-httplib2 google-api-python-client
+        run: pip install requests pandas
 
-      # 4. Lancer le script de récupération et génération
       - name: Fetch data & build JSON
-        env:
-          GDRIVE_CREDENTIALS: ${{ secrets.GDRIVE_CREDENTIALS }}
-          GDRIVE_FOLDER_ID:   ${{ secrets.GDRIVE_FOLDER_ID }}
         run: python fetch_and_build.py
 
-      # 5. Pousser qivia_data.json mis à jour sur le dépôt
-      - name: Commit & push qivia_data.json
+      - name: Commit & push CSV + JSON
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add qivia_data.json
-          git diff --cached --quiet || git commit -m "chore: mise à jour données $(date +'%Y-%m-%d')"
+          git add csv/ qivia_data.json
+          git diff --cached --quiet || git commit -m "chore: données $(date +'%Y-%m-%d')"
           git push
