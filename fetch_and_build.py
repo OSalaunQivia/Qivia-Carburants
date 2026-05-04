@@ -24,13 +24,17 @@ CSV_DIR    = "csv"
 BRAND_FILE = "Prix carburant - Liste brand - Overpass.csv"
 
 BRAND_MAP = {
-    'TotalEnergies': 'Total', 'Total Access': 'Total',
-    'E.Leclerc': 'Leclerc',
+    'TotalEnergies': 'Total', 'Total Access': 'Total', 'Total Express': 'Total',
+    'E.Leclerc': 'Leclerc', 'Leclerc Express': 'Leclerc',
     'Esso Express': 'Esso',
-    'Système U': 'Super U',
-    'Carrefour Market': 'Carrefour',
-    'Carrefour Contact': 'Carrefour',
-    'Carrefour City': 'Carrefour',
+    'Système U': 'Super U', 'U Express': 'Super U', 'Hyper U': 'Super U',
+    'Carrefour Market': 'Carrefour', 'Carrefour Contact': 'Carrefour',
+    'Carrefour City': 'Carrefour', 'Carrefour Express': 'Carrefour',
+    'Eni': 'Eni/Agip', 'Agip': 'Eni/Agip', 'ENI': 'Eni/Agip',
+    'Intermarché Contact': 'Intermarché', 'Intermarché Express': 'Intermarché',
+    'Géant Casino': 'Casino', 'Casino': 'Casino',
+    'BP': 'BP', 'Shell': 'Shell',
+    'Dyneff': 'Dyneff', 'Elan': 'Elan',
 }
 
 
@@ -207,7 +211,21 @@ def build_aggregates(df):
             **{f: round(float(r[f]),4) if pd.notna(r.get(f)) else None for f in FUELS},
         })
 
-    return {
+    # Brand × Region daily
+    brand_region_daily = []
+    if brand_col and reg_col:
+        for (dt, brand, region), g in all_data[all_data[brand_col].isin(top_brands)].groupby(
+            ["snapshot_date", brand_col, reg_col]
+        ):
+            brand_region_daily.append({
+                "date": str(dt.date()),
+                "brand": str(brand),
+                "region": str(region),
+                **fr(g)
+            })
+    print(f"[Agg] brand_region_daily: {len(brand_region_daily)} entrées")
+
+        return {
         "meta": {
             "generated":     datetime.date.today().isoformat(),
             "n_stations":    int(all_data["provider_id"].nunique()) if "provider_id" in all_data else len(latest),
@@ -224,7 +242,9 @@ def build_aggregates(df):
         },
         "daily":daily,"weekly":weekly,"monthly":monthly,
         "quarterly":quarterly,"half_yearly":half_yearly,"yearly":yearly,
-        "regional_daily":regional_daily,"brand_daily":brand_daily,"stations":stations,
+        "regional_daily":regional_daily,"brand_daily":brand_daily,
+        "brand_region_daily":brand_region_daily,
+        "stations":stations,
     }
 
 
