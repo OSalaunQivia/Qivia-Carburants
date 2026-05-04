@@ -1,7 +1,7 @@
 """
 fetch_and_build.py — QIVIA
 Récupère les prix depuis l'API gouvernementale,
-joint avec Prix_carburant_-_Liste_brand_-_Overpass.csv pour les marques,
+joint avec Prix carburant - Liste brand - Overpass.csv pour les marques,
 génère le CSV du jour et qivia_data.json.
 """
 
@@ -21,7 +21,7 @@ API_FIELDS = [
 FUELS      = ["gazole_prix","sp95_prix","e10_prix","sp98_prix","e85_prix","gplc_prix"]
 TOP_BRANDS = 12
 CSV_DIR    = "csv"
-BRAND_FILE = "Prix_carburant_-_Liste_brand_-_Overpass.csv"
+BRAND_FILE = "Prix carburant - Liste brand - Overpass.csv"
 
 BRAND_MAP = {
     'TotalEnergies': 'Total', 'Total Access': 'Total',
