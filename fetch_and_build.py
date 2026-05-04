@@ -1,10 +1,11 @@
 """
 fetch_and_build.py — QIVIA
-Récupère les prix + région + département depuis l'API gouvernementale
-et extrait la marque depuis le nom de la station.
+Récupère les prix depuis l'API gouvernementale,
+joint avec Prix_carburant_-_Liste_brand_-_Overpass.csv pour les marques,
+génère le CSV du jour et qivia_data.json.
 """
 
-import json, os, time, datetime, requests, pandas as pd, glob, re
+import json, os, time, datetime, requests, pandas as pd, glob
 
 API_URL = (
     "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets"
@@ -12,34 +13,46 @@ API_URL = (
 )
 API_FIELDS = [
     "id","adresse","cp","ville","region","departement",
+    "latitude","longitude","services_service","carburants_disponibles",
     "gazole_prix","gazole_maj","sp95_prix","sp95_maj",
     "e10_prix","e10_maj","sp98_prix","sp98_maj",
     "e85_prix","e85_maj","gplc_prix","gplc_maj",
-    "services_service","carburants_disponibles",
 ]
 FUELS      = ["gazole_prix","sp95_prix","e10_prix","sp98_prix","e85_prix","gplc_prix"]
 TOP_BRANDS = 12
 CSV_DIR    = "csv"
+BRAND_FILE = "Prix_carburant_-_Liste_brand_-_Overpass.csv"
 
-# Marques connues à détecter dans le nom de la station
-KNOWN_BRANDS = [
-    "Total","TotalEnergies","Esso","BP","Shell","Avia","Leclerc","Intermarché",
-    "Carrefour","Super U","Système U","Auchan","Casino","Géant","Netto",
-    "Dyneff","Eni","Agip","Petit Casino","Vito","Elyrion","Prom'oil",
-]
+BRAND_MAP = {
+    'TotalEnergies': 'Total', 'Total Access': 'Total',
+    'E.Leclerc': 'Leclerc',
+    'Esso Express': 'Esso',
+    'Système U': 'Super U',
+    'Carrefour Market': 'Carrefour',
+    'Carrefour Contact': 'Carrefour',
+    'Carrefour City': 'Carrefour',
+}
 
-def detect_brand(name):
-    if not name: return "Autre"
-    name_upper = name.upper()
-    for brand in KNOWN_BRANDS:
-        if brand.upper() in name_upper:
-            # Normaliser quelques variantes
-            if brand in ["TotalEnergies"]: return "Total"
-            if brand in ["Système U","Super U"]: return "Super U"
-            if brand in ["Agip"]: return "Eni/Agip"
-            if brand in ["Géant","Casino","Petit Casino"]: return "Casino"
-            return brand
-    return "Autre"
+
+def load_brands():
+    """Charge le fichier Overpass avec les marques."""
+    if not os.path.exists(BRAND_FILE):
+        print(f"[Brand] Fichier {BRAND_FILE} non trouvé — marques non disponibles")
+        return pd.DataFrame(columns=['provider_id','brand','station_name'])
+
+    df = pd.read_csv(BRAND_FILE, low_memory=False)
+    df = df[['tags/ref:FR:prix-carburants','tags/brand','tags/name']].copy()
+    df = df.rename(columns={
+        'tags/ref:FR:prix-carburants': 'provider_id',
+        'tags/brand': 'brand',
+        'tags/name': 'station_name'
+    })
+    df['provider_id'] = df['provider_id'].astype(str).str.strip()
+    df = df.dropna(subset=['provider_id','brand'])
+    df['brand'] = df['brand'].replace(BRAND_MAP)
+    print(f"[Brand] {len(df)} stations avec marque chargées")
+    print(f"[Brand] Top marques: {df['brand'].value_counts().head(5).to_dict()}")
+    return df
 
 
 def fetch_api():
@@ -64,23 +77,43 @@ def fetch_api():
     return rows
 
 
-def build_dataframe(rows):
+def build_dataframe(rows, brands_df):
     df = pd.DataFrame(rows)
+
+    # Nettoyer les types
     for c in [col for col in df.columns if col.endswith("_maj")]:
         df[c] = pd.to_datetime(df[c], errors="coerce", utc=True)
     for f in FUELS:
         if f in df.columns:
             df[f] = pd.to_numeric(df[f], errors="coerce")
+
+    # Renommer
     df = df.rename(columns={
-        "id":        "provider_id",
-        "adresse":   "address",
-        "cp":        "postal",
-        "ville":     "city",
+        "id":          "provider_id",
+        "adresse":     "address",
+        "cp":          "postal",
+        "ville":       "city",
         "departement": "department",
     })
-    # Extraire la marque depuis le nom de la station
-    df["brand"] = df["address"].apply(detect_brand)
-    df["name"]  = df["address"]
+
+    # Normaliser provider_id pour la jointure
+    df["provider_id"] = df["provider_id"].astype(str).str.strip()
+
+    # Jointure avec les marques
+    if len(brands_df) > 0:
+        df = df.merge(
+            brands_df[['provider_id','brand','station_name']],
+            on='provider_id',
+            how='left'
+        )
+        df['name'] = df['station_name'].fillna(df['address'])
+        df['brand'] = df['brand'].fillna('Autre')
+        matched = df['brand'].ne('Autre').sum()
+        print(f"[Merge] {matched}/{len(df)} stations avec marque identifiée ({matched/len(df)*100:.1f}%)")
+    else:
+        df['brand'] = 'Autre'
+        df['name']  = df['address']
+
     df["snapshot_date"] = datetime.date.today().isoformat()
     return df
 
@@ -91,11 +124,6 @@ def save_csv(df):
     path  = os.path.join(CSV_DIR, f"stations_avec_prix_{today}.csv")
     df.to_csv(path, index=False)
     print(f"[CSV] {path} ({len(df)} lignes)")
-    # Stats marques
-    print("[CSV] Top marques:", df["brand"].value_counts().head(5).to_dict())
-    # Stats régions
-    if "region" in df.columns:
-        print("[CSV] Régions:", df["region"].nunique(), "régions")
     return path
 
 
@@ -198,8 +226,9 @@ def main():
     print(f"  {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*55}\n")
 
-    rows = fetch_api()
-    df   = build_dataframe(rows)
+    brands_df = load_brands()
+    rows      = fetch_api()
+    df        = build_dataframe(rows, brands_df)
     save_csv(df)
 
     print("[JSON] Calcul des agrégats…")
@@ -207,9 +236,9 @@ def main():
     with open("qivia_data.json","w",encoding="utf-8") as fp:
         json.dump(data, fp, ensure_ascii=False, separators=(",",":"))
     print(f"[JSON] qivia_data.json ({os.path.getsize('qivia_data.json')//1024} Ko)")
-    print(f"\n[OK] Terminé — {data['meta']['n_snapshots']} snapshots")
-    print(f"     Régions  : {data['meta']['regions'][:3]}…")
-    print(f"     Marques  : {data['meta']['brands'][:5]}\n")
+    print(f"\n[OK] Terminé !")
+    print(f"     Régions : {data['meta']['regions'][:3]}…")
+    print(f"     Marques : {data['meta']['brands'][:5]}\n")
 
 
 if __name__ == "__main__":
