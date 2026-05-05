@@ -222,7 +222,7 @@ function getGlobalBrandDaily(){
 }
 
 function avg(arr){const v=arr.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b)/v.length:null;}
-function fmtd(d){return d.slice(5).replace('-','/');}
+function fmtd(d){const p=d.slice(5).split('-');return p[1]+'/'+p[0];}
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
 
 async function boot(){
