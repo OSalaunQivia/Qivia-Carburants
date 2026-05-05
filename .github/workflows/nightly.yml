@@ -2,7 +2,7 @@ name: Qivia — Mise à jour quotidienne
 
 on:
   schedule:
-    - cron: '0 5 * * *'   # 05h00 UTC = 07h00 heure française
+    - cron: '0 5 * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -31,7 +33,8 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
+          git reset --hard HEAD
+          git pull origin main
           git add csv/ qivia_data.json
           git diff --cached --quiet || git commit -m "chore: données $(date +'%Y-%m-%d')"
           git push
