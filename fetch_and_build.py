@@ -12,7 +12,7 @@ API_URL = (
     "/prix-des-carburants-en-france-flux-instantane-v2/records"
 )
 API_FIELDS = [
-    "id","adresse","cp","ville","region","departement",
+    "id","adresse","cp","ville","region","departement","code_departement",
     "latitude","longitude","services_service","carburants_disponibles",
     "gazole_prix","gazole_maj","sp95_prix","sp95_maj",
     "e10_prix","e10_maj","sp98_prix","sp98_maj",
@@ -24,7 +24,7 @@ CSV_DIR    = "csv"
 BRAND_FILE = "Prix carburant - Liste brand - Overpass.csv"
 
 BRAND_MAP = {
-    'TotalEnergies': 'Total', 'Total Access': 'Total', 'Total Express': 'Total',
+    'TotalEnergies': 'TotalEnergies', 'Total': 'TotalEnergies', 'Total Access': 'TotalEnergies', 'Total Express': 'TotalEnergies',
     'E.Leclerc': 'Leclerc', 'Leclerc Express': 'Leclerc',
     'Esso Express': 'Esso',
     'Système U': 'Super U', 'U Express': 'Super U', 'Hyper U': 'Super U',
@@ -93,11 +93,12 @@ def build_dataframe(rows, brands_df):
 
     # Renommer
     df = df.rename(columns={
-        "id":          "provider_id",
-        "adresse":     "address",
-        "cp":          "postal",
-        "ville":       "city",
-        "departement": "department",
+        "id":             "provider_id",
+        "adresse":        "address",
+        "cp":             "postal",
+        "ville":          "city",
+        "departement":    "department",
+        "code_departement": "dept_code",
     })
 
     # Normaliser provider_id pour la jointure
@@ -203,13 +204,22 @@ def build_aggregates(df):
     for _,r in latest.iterrows():
         if all(pd.isna(r.get(f)) for f in FUELS): continue
         stations.append({
-            "uuid":   str(r.get("provider_id","")),
-            "name":   str(r.get("name",r.get("address","")))[:50],
-            "city":   str(r.get("city","")),
-            "region": str(r.get("region","")),
-            "brand":  str(r.get("brand","")),
+            "uuid":       str(r.get("provider_id","")),
+            "name":       str(r.get("name",r.get("address","")))[:50],
+            "city":       str(r.get("city","")),
+            "region":     str(r.get("region","")),
+            "department": str(r.get("department","")),
+            "brand":      str(r.get("brand","")),
             **{f: round(float(r[f]),4) if pd.notna(r.get(f)) else None for f in FUELS},
         })
+
+    # Department daily
+    dept_daily = []
+    dept_col = "department" if "department" in all_data.columns else None
+    if dept_col:
+        for (dt, dept), g in all_data.groupby(["snapshot_date", dept_col]):
+            dept_daily.append({"date": str(dt.date()), "department": str(dept), **fr(g)})
+    print(f"[Agg] dept_daily: {len(dept_daily)} entrées")
 
     # Brand × Region daily
     brand_region_daily = []
@@ -238,12 +248,14 @@ def build_aggregates(df):
             "halves":        sorted(all_data["half"].unique().tolist()),
             "years":         sorted([int(y) for y in all_data["year"].unique().tolist()]),
             "regions":       sorted([str(r) for r in all_data[reg_col].dropna().unique()]) if reg_col else [],
+            "departments":   sorted([str(d) for d in all_data["department"].dropna().unique()]) if "department" in all_data.columns else [],
             "brands":        top_brands,
         },
         "daily":daily,"weekly":weekly,"monthly":monthly,
         "quarterly":quarterly,"half_yearly":half_yearly,"yearly":yearly,
         "regional_daily":regional_daily,"brand_daily":brand_daily,
         "brand_region_daily":brand_region_daily,
+        "dept_daily":dept_daily,
         "stations":stations,
     }
 
