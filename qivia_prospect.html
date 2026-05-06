@@ -31,6 +31,10 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 /* FILTER BAR */
 .fbar{background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;padding:7px 20px;flex-shrink:0;flex-wrap:wrap;}
 .fbar-label{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;}
+.ttc-toggle{display:flex;background:rgba(0,0,0,.06);border-radius:6px;padding:2px;border:1px solid var(--border);}
+.ttc-opt{padding:3px 10px;border-radius:5px;font-size:.72rem;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s;}
+.ttc-opt.active{background:var(--white);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.1);}
+select[multiple].fs{height:auto;max-height:120px;}
 .fsep{width:1px;height:20px;background:var(--border);flex-shrink:0;margin:0 4px;}
 select.fs{border:1px solid var(--border);background:var(--white);color:var(--text);border-radius:7px;padding:5px 10px;font-family:'Inter',sans-serif;font-size:.75rem;font-weight:500;cursor:pointer;outline:none;}
 select.fs:focus{border-color:var(--green);}
@@ -135,10 +139,7 @@ select.fs:focus{border-color:var(--green);}
           <div class="nav-item-icon" style="background:rgba(45,107,228,.2)">🗺</div>
           Carte des stations
         </a>
-        <a class="nav-item" href="qivia_dashboard.html">
-          <div class="nav-item-icon" style="background:rgba(249,115,22,.2)">📈</div>
-          Dashboard interne
-        </a>
+
       </div>
     </div>
   </div>
@@ -169,16 +170,24 @@ select.fs:focus{border-color:var(--green);}
   <span class="fbar-label">Zone</span>
   <select class="fs" id="gf-zone-type" onchange="onZoneTypeChange()">
     <option value="">France entière</option>
-    <option value="region">Région</option>
-    <option value="dept">Département</option>
+    <option value="region">Région(s)</option>
+    <option value="dept">Département(s)</option>
   </select>
-  <select class="fs" id="gf-region" onchange="onGlobalFilter()" style="display:none"><option value="">Région…</option></select>
-  <select class="fs" id="gf-dept" onchange="onGlobalFilter()" style="display:none"><option value="">Département…</option></select>
+  <select class="fs" id="gf-region" onchange="onGlobalFilter()" style="display:none;min-width:140px" multiple size="1"><option value="">Toutes les régions</option></select>
+  <select class="fs" id="gf-dept" onchange="onGlobalFilter()" style="display:none;min-width:160px" multiple size="1"><option value="">Tous les départements</option></select>
   <div class="fsep"></div>
   <span class="fbar-label">Enseigne</span>
   <select class="fs" id="gf-brand" onchange="onGlobalFilter()">
     <option value="">Toutes les enseignes</option>
   </select>
+  <div class="fsep"></div>
+  <div style="display:flex;align-items:center;gap:6px;">
+    <span class="fbar-label">Prix</span>
+    <div class="ttc-toggle" id="ttc-toggle" onclick="toggleTTC()">
+      <div class="ttc-opt active" id="ttc-opt">TTC</div>
+      <div class="ttc-opt" id="ht-opt">HT</div>
+    </div>
+  </div>
 </div>
 
 <div class="grid">
@@ -276,25 +285,26 @@ const BRAND_COLORS={
 function getBrandColor(b){return BRAND_COLORS[b]||'#E0E0E0';}
 const CB={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6E7A8A',font:{family:'Inter',size:11},boxWidth:10,padding:10}},tooltip:{backgroundColor:'#0D1117',borderColor:'rgba(255,255,255,.08)',borderWidth:1,titleColor:'#fff',bodyColor:'rgba(255,255,255,.6)',titleFont:{family:'Inter',weight:'700',size:12},bodyFont:{family:'JetBrains Mono',size:11},padding:10,cornerRadius:8}},scales:{x:{ticks:{color:'#6E7A8A',font:{family:'JetBrains Mono',size:10}},grid:{color:'#EAECEF'}},y:{ticks:{color:'#6E7A8A',font:{family:'JetBrains Mono',size:10}},grid:{color:'#EAECEF'}}}};
 let DATA=null,charts={};
-let GF={fuel:'gazole_prix',region:'',dept:'',period:'7',brand:''};
+let GF={fuel:'gazole_prix',region:'',regions:[],dept:'',depts:[],period:'7',brand:''};
 
-function getZoneLabel(){return GF.dept||GF.region||'France entière';}
+function getZoneLabel(){
+  if(GF.depts&&GF.depts.length>1) return GF.depts.join(', ');
+  if(GF.regions&&GF.regions.length>1) return GF.regions.join(', ');
+  return GF.dept||GF.region||'France entière';
+}
 function getBrandDaily(){
-  // Si département sélectionné : filtrer brand_region_daily par région des stations du dept
-  // ou fallback sur brand_daily national
-  if(GF.dept){
+  const depts = GF.depts&&GF.depts.length ? GF.depts : (GF.dept?[GF.dept]:[]);
+  const regions = GF.regions&&GF.regions.length ? GF.regions : (GF.region?[GF.region]:[]);
+  if(depts.length){
     if(DATA.brand_region_daily&&DATA.brand_region_daily.length){
-      // Trouver la région du département via les stations
-      const stInDept=DATA.stations.filter(s=>String(s.department||'').trim()===String(GF.dept).trim());
-      const regions=new Set(stInDept.map(s=>s.region).filter(Boolean));
-      if(regions.size>0){
-        const region=[...regions][0]; // prendre la première région
-        return DATA.brand_region_daily.filter(r=>r.region===region);
-      }
+      const stInDept=DATA.stations.filter(s=>depts.includes(String(s.department||'').trim()));
+      const regSet=new Set(stInDept.map(s=>s.region).filter(Boolean));
+      if(regSet.size>0) return DATA.brand_region_daily.filter(r=>regSet.has(r.region));
     }
-    return DATA.brand_daily; // fallback national
+    return DATA.brand_daily;
   }
-  if(GF.region&&DATA.brand_region_daily&&DATA.brand_region_daily.length) return DATA.brand_region_daily.filter(r=>r.region===GF.region);
+  if(regions.length&&DATA.brand_region_daily&&DATA.brand_region_daily.length)
+    return DATA.brand_region_daily.filter(r=>regions.includes(r.region));
   return DATA.brand_daily;
 }
 function getFilteredDates(){const all=DATA.meta.dates;if(GF.period==='all')return all;return all.slice(-parseInt(GF.period));}
@@ -316,7 +326,7 @@ DATA.brand_daily=DATA.brand_daily.map(r=>({...r,brand:r.brand==='Total'?'TotalEn
 if(DATA.brand_region_daily) DATA.brand_region_daily=DATA.brand_region_daily.map(r=>({...r,brand:r.brand==='Total'?'TotalEnergies':r.brand}));
 DATA.stations=DATA.stations.map(s=>({...s,brand:s.brand==='Total'?'TotalEnergies':s.brand}));
 // Normaliser Total → TotalEnergies dans les données du JSON
-DATA.meta.brands = DATA.meta.brands.map(b=>b==='Total'?'TotalEnergies':b);
+DATA.meta.brands = [...new Set(DATA.meta.brands.map(b=>b==='Total'?'TotalEnergies':b))];
 DATA.brand_daily = DATA.brand_daily.map(r=>({...r, brand:r.brand==='Total'?'TotalEnergies':r.brand}));
 if(DATA.brand_region_daily) DATA.brand_region_daily = DATA.brand_region_daily.map(r=>({...r, brand:r.brand==='Total'?'TotalEnergies':r.brand}));
 if(DATA.dept_daily) DATA.dept_daily = DATA.dept_daily.map(r=>({...r, brand:r.brand==='Total'?'TotalEnergies':r.brand}));
@@ -351,10 +361,31 @@ function onGlobalFilter(){
   GF.period=document.getElementById('gf-period').value;
   GF.brand=document.getElementById('gf-brand').value;
   const zt=document.getElementById('gf-zone-type').value;
-  GF.region=zt==='region'?document.getElementById('gf-region').value:'';
-  GF.dept=zt==='dept'?document.getElementById('gf-dept').value:'';
+  // Multi-select support
+  if(zt==='region'){
+    const sel=document.getElementById('gf-region');
+    GF.regions=[...sel.selectedOptions].map(o=>o.value).filter(Boolean);
+    GF.region=GF.regions[0]||'';
+    GF.dept='';GF.depts=[];
+  } else if(zt==='dept'){
+    const sel=document.getElementById('gf-dept');
+    GF.depts=[...sel.selectedOptions].map(o=>o.value).filter(Boolean);
+    GF.dept=GF.depts[0]||'';
+    GF.region='';GF.regions=[];
+  } else {
+    GF.region='';GF.regions=[];GF.dept='';GF.depts=[];
+  }
   buildAll();
 }
+
+let isTTC = true;
+function toggleTTC(){
+  isTTC = !isTTC;
+  document.getElementById('ttc-opt').classList.toggle('active', isTTC);
+  document.getElementById('ht-opt').classList.toggle('active', !isTTC);
+  buildAll();
+}
+function applyTax(v){ return v==null?null : isTTC ? v : parseFloat((v/1.2).toFixed(4)); }
 
 function buildAll(){calcHeroSaving();buildBloc1();buildBloc2();buildBloc3();buildSim();buildBloc5();}
 
@@ -400,13 +431,15 @@ function buildBloc2(){
   const avgs=active.map(b=>{const vals=bd.filter(r=>r.brand===b&&dates.includes(r.date)&&r[fuel]!=null).map(r=>r[fuel]);return{b,v:vals.length?vals.reduce((a,c)=>a+c)/vals.length:null};}).filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);
   const minVal=avgs.length?Math.min(...avgs.map(x=>x.v)):1.5;
   dc('b2');
-  charts['b2']=new Chart(document.getElementById('ch-b2'),{type:'bar',data:{labels:avgs.map(x=>x.b),datasets:[{label:FL[fuel]+' €/L',data:avgs.map(x=>parseFloat(x.v.toFixed(4))),backgroundColor:avgs.map(x=>getBrandColor(x.b)),borderRadius:7,borderSkipped:false}]},options:{...CB,plugins:{...CB.plugins,legend:{display:false}},scales:{x:{...CB.scales.x},y:{...CB.scales.y,min:Math.min(1.5,minVal-0.02),ticks:{...CB.scales.y.ticks,callback:v=>v.toFixed(3)+' €'}}}}});
+  charts['b2']=new Chart(document.getElementById('ch-b2'),{type:'bar',data:{labels:avgs.map(x=>x.b),datasets:[{label:FL[fuel]+' €/L',data:avgs.map(x=>parseFloat(x.v.toFixed(4))),backgroundColor:avgs.map(x=>getBrandColor(x.b)),borderRadius:7,borderSkipped:false}]},options:{...CB,plugins:{...CB.plugins,legend:{display:false}},scales:{x:{...CB.scales.x},y:{...CB.scales.y,min:Math.min(1.5,minVal-0.02),ticks:{...CB.scales.y.ticks,callback:v=>applyTax(v).toFixed(3)+' €'}}}}});
 }
 
 function buildBloc3(){
   const brand=GF.brand,region=GF.region,dept=GF.dept;
   let allSt=DATA.stations||[];
-  let filtSt=dept?allSt.filter(s=>String(s.department||'').trim()===String(dept).trim()):region?allSt.filter(s=>String(s.region||'').trim()===String(region).trim()):allSt;
+  const depts=GF.depts&&GF.depts.length?GF.depts:(dept?[dept]:[]);
+  const regions=GF.regions&&GF.regions.length?GF.regions:(region?[region]:[]);
+  let filtSt=depts.length?allSt.filter(s=>depts.includes(String(s.department||'').trim())):regions.length?allSt.filter(s=>regions.includes(String(s.region||'').trim())):allSt;
   const qCount=(!dept&&!region)?DATA.meta.n_stations:filtSt.length;
   const cCount=brand?filtSt.filter(s=>s.brand===brand).length:null;
   document.getElementById('b3-qivia-count').textContent=qCount.toLocaleString('fr-FR');
@@ -437,10 +470,11 @@ function buildSim(){
   const bestPrice=Object.values(dateMap).length?Object.values(dateMap).reduce((a,b)=>a+b)/Object.values(dateMap).length:null;
   if(!currentPrice||!bestPrice)return;
   const budgetC=currentPrice*liters,budgetQ=bestPrice*liters,saving=budgetC-budgetQ;
-  document.getElementById('sim-current-price').textContent=currentPrice.toFixed(4)+' €/L';
-  document.getElementById('sim-best-price').textContent=bestPrice.toFixed(4)+' €/L';
-  document.getElementById('sim-budget-current').textContent=budgetC.toFixed(2)+' €';
-  document.getElementById('sim-budget-qivia').textContent=budgetQ.toFixed(2)+' €';
+  const taxLabel=isTTC?'TTC':'HT';
+  document.getElementById('sim-current-price').textContent=applyTax(currentPrice).toFixed(4)+' €/L '+taxLabel;
+  document.getElementById('sim-best-price').textContent=applyTax(bestPrice).toFixed(4)+' €/L '+taxLabel;
+  document.getElementById('sim-budget-current').textContent=applyTax(budgetC).toFixed(2)+' €';
+  document.getElementById('sim-budget-qivia').textContent=applyTax(budgetQ).toFixed(2)+' €';
   if(saving>0){document.getElementById('sim-saving-row').style.display='';document.getElementById('sim-saving-val').textContent=saving.toFixed(2)+' €';document.getElementById('sim-saving-annual').textContent='Soit '+(saving*12).toFixed(0)+' €/an · '+(PERIOD_LABELS[GF.period]||GF.period);}
   else document.getElementById('sim-saving-row').style.display='none';
 }
