@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qivia — Accès</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;font-family:'Inter',sans-serif;}
+body{background:#0D1117;display:flex;align-items:center;justify-content:center;}
+.card{background:#1e293b;border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:48px 40px;width:380px;text-align:center;}
+.logo-q{width:48px;height:48px;border-radius:12px;background:#00C48C;display:flex;align-items:center;justify-content:center;color:#0D1117;font-size:1.2rem;font-weight:800;margin:0 auto 16px;}
+h1{font-size:1.4rem;font-weight:800;color:#fff;margin-bottom:6px;}
+p{font-size:.82rem;color:rgba(255,255,255,.45);margin-bottom:32px;}
+.field{position:relative;margin-bottom:16px;}
+input{width:100%;background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.12);color:#fff;border-radius:10px;padding:12px 16px;font-family:'Inter',sans-serif;font-size:.9rem;outline:none;transition:border-color .2s;}
+input:focus{border-color:#00C48C;}
+input::placeholder{color:rgba(255,255,255,.3);}
+.btn{width:100%;padding:13px;background:#00C48C;color:#0D1117;border:none;border-radius:10px;font-family:'Inter',sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;transition:background .2s;}
+.btn:hover{background:#00b37e;}
+.error{color:#F04E37;font-size:.78rem;margin-top:12px;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-q">Q</div>
+  <h1>Qivia</h1>
+  <p>Entrez le mot de passe pour accéder à l'espace</p>
+  <div class="field">
+    <input type="password" id="pwd" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')login()">
+  </div>
+  <button class="btn" onclick="login()">Accéder →</button>
+  <div class="error" id="err">Mot de passe incorrect</div>
+</div>
+<script>
+// Hash du mot de passe "Qivia"
+const HASH = "c75e7569da00da99eed40d29cb51c4f3104c54a9ff1030bcbd2a79df25cc7ae5";
+
+async function sha256(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function login(){
+  const val = document.getElementById('pwd').value;
+  const hash = await sha256(val);
+  if(hash === HASH){
+    sessionStorage.setItem('qivia_auth','1');
+    window.location.href = 'qivia_prospect.html';
+  } else {
+    document.getElementById('err').style.display = 'block';
+    document.getElementById('pwd').value = '';
+    document.getElementById('pwd').focus();
+  }
+}
+
+// Si déjà authentifié, rediriger
+if(sessionStorage.getItem('qivia_auth')==='1'){
+  window.location.href = 'qivia_prospect.html';
+}
+</script>
+</body>
+</html>
