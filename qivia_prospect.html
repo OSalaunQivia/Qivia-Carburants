@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script>
+if(sessionStorage.getItem('qivia_auth')!=='1'){
+  window.location.href='index.html';
+}
+</script>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Qivia — Présentation Prospect</title>
@@ -45,11 +51,10 @@ select.fs:focus{border-color:var(--green);}
 }
 .grid > .cell, .grid > .row-right { min-height:0; overflow:hidden; }
 .row{display:contents;}
-.row-right{display:flex;flex-direction:column;gap:20px;min-height:0;}
+.row-right{display:flex;flex-direction:column;gap:20px;min-height:0;overflow:hidden;height:100%;}
 
 .cell{background:var(--white);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;padding:18px 20px;min-height:0;overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.04);}
 .cell-title{display:flex;align-items:center;gap:7px;flex-shrink:0;margin-bottom:10px;}
-.row-right .cell-title{margin-bottom:7px;}
 .cell-num{width:22px;height:22px;border-radius:6px;background:var(--navy);color:#fff;font-size:.65rem;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .cell-title h2{font-size:.82rem;font-weight:700;}
 .chart-area{flex:1;min-height:0;position:relative;overflow:hidden;}
@@ -67,29 +72,29 @@ select.fs:focus{border-color:var(--green);}
 .st-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
 
 /* BLOC 4 — simulateur */
-.sim-layout{display:grid;grid-template-columns:1fr 1fr;gap:7px;flex:1;min-height:0;}
-.sim-inputs{display:flex;flex-direction:column;gap:5px;}
-.sim-field label{display:block;font-size:.56rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
-.sim-input{width:100%;border:1.5px solid var(--border);background:var(--white);color:var(--text);border-radius:7px;padding:4px 8px;font-family:'Inter',sans-serif;font-size:.75rem;font-weight:600;outline:none;}
+.sim-layout{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0;}
+.sim-inputs{display:flex;flex-direction:column;gap:8px;}
+.sim-field label{display:block;font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.sim-input{width:100%;border:1.5px solid var(--border);background:var(--white);color:var(--text);border-radius:8px;padding:6px 10px;font-family:'Inter',sans-serif;font-size:.8rem;font-weight:600;outline:none;}
 .sim-input:focus{border-color:var(--green);}
-.sim-result{background:#F1F3F5;border:1px solid var(--border);border-radius:9px;padding:8px;display:flex;flex-direction:column;}
-.sim-result-title{font-size:.54rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;}
-.sim-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);}
+.sim-result{background:#F1F3F5;border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;overflow-y:auto;flex:1;min-height:0;}
+.sim-result-title{font-size:.58rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.sim-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);}
 .sim-row:last-of-type{border-bottom:none;}
-.sim-row-lbl{font-size:.63rem;color:var(--muted);}
-.sim-row-val{font-size:.75rem;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.sim-row-lbl{font-size:.7rem;color:var(--muted);}
+.sim-row-val{font-size:.85rem;font-weight:700;font-family:'JetBrains Mono',monospace;}
 .sim-row-val.g{color:var(--gdk);}.sim-row-val.r{color:var(--red);}
-.sim-saving{margin-top:5px;background:var(--green);border-radius:7px;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;}
-.sim-saving-lbl{font-size:.63rem;font-weight:700;color:var(--navy);}
-.sim-saving-sub{font-size:.55rem;color:rgba(13,17,23,.6);margin-top:1px;}
-.sim-saving-val{font-size:1rem;font-weight:800;color:var(--navy);font-family:'JetBrains Mono',monospace;}
+.sim-saving{margin-top:8px;background:var(--green);border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;}
+.sim-saving-lbl{font-size:.7rem;font-weight:700;color:var(--navy);}
+.sim-saving-sub{font-size:.6rem;color:rgba(13,17,23,.6);margin-top:2px;}
+.sim-saving-val{font-size:1.2rem;font-weight:800;color:var(--navy);font-family:'JetBrains Mono',monospace;}
 
 /* BLOC 5 — résumé */
-.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:6px;flex:1;min-height:0;}
-.sum-item{background:#F8F9FB;border-radius:8px;padding:7px 10px;border:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;}
-.sum-lbl{font-size:.54rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;}
-.sum-val{font-size:.78rem;font-weight:700;color:var(--text);}
-.sum-val.green{color:var(--gdk);font-size:.88rem;}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:6px;flex:1;min-height:0;overflow:hidden;}
+.sum-item{background:#F8F9FB;border-radius:9px;padding:8px 12px;border:1px solid var(--border);display:flex;flex-direction:column;justify-content:center;min-height:0;}
+.sum-lbl{font-size:.58rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.sum-val{font-size:.88rem;font-weight:700;color:var(--text);}
+.sum-val.green{color:var(--gdk);font-size:1rem;}
 .sum-val.blue{color:#2D6BE4;}
 
 @media(max-width:1024px){
@@ -101,8 +106,42 @@ select.fs:focus{border-color:var(--green);}
 </head>
 <body>
 
+<style>
+.nav-wrap{position:relative;}
+.nav-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+.nav-btn:hover{background:rgba(255,255,255,.15);}
+.nav-arrow{font-size:.6rem;color:rgba(255,255,255,.5);}
+.nav-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:10px;min-width:200px;z-index:999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.nav-dropdown.open{display:block;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;color:rgba(255,255,255,.8);font-size:.8rem;font-weight:500;cursor:pointer;border-radius:8px;margin:4px;text-decoration:none;}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-item.active{background:rgba(0,196,140,.15);color:var(--green);}
+.nav-item-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+</style>
 <header class="hdr">
-  <div class="logo"><div class="logo-q">Q</div><span class="logo-g">Qivia</span><span style="color:rgba(255,255,255,.2);margin:0 8px">|</span><span style="font-weight:400;font-size:.78rem;color:rgba(255,255,255,.5)">Présentation Prospect</span></div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="logo"><div class="logo-q">Q</div><span class="logo-g">Qivia</span></div>
+    <div class="nav-wrap">
+      <button class="nav-btn" onclick="toggleNav()" id="nav-btn">
+        <span id="nav-current">Présentation Prospect</span>
+        <span class="nav-arrow">▼</span>
+      </button>
+      <div class="nav-dropdown" id="nav-dropdown">
+        <a class="nav-item active" href="qivia_prospect.html">
+          <div class="nav-item-icon" style="background:rgba(0,196,140,.2)">📊</div>
+          Présentation Prospect
+        </a>
+        <a class="nav-item" href="qivia_carte.html">
+          <div class="nav-item-icon" style="background:rgba(45,107,228,.2)">🗺</div>
+          Carte des stations
+        </a>
+        <a class="nav-item" href="qivia_dashboard.html">
+          <div class="nav-item-icon" style="background:rgba(249,115,22,.2)">📈</div>
+          Dashboard interne
+        </a>
+      </div>
+    </div>
+  </div>
   <div class="hdr-right">
     <div class="hdr-stat"><div class="hdr-stat-val" id="hero-stations">—</div><div class="hdr-stat-lbl">Stations Qivia</div></div>
     <div class="hdr-stat"><div class="hdr-stat-val" id="hero-saving">—</div><div class="hdr-stat-lbl">Éco. GMS vs Pétroliers</div></div>
@@ -171,17 +210,19 @@ select.fs:focus{border-color:var(--green);}
   <!-- Bloc 4+5 : col2 row2 -->
   <div class="row-right">
       <!-- Bloc 4 haut -->
-      <div class="cell" style="flex:1;min-height:0;padding:12px 14px;">
+      <div class="cell" style="flex:1;min-height:0;overflow:hidden;">
         <div class="cell-title"><div class="cell-num">4</div><h2>Simulateur d'économies</h2></div>
         <div class="sim-layout">
           <div class="sim-inputs">
             <div class="sim-field"><label>Litrage mensuel (L)</label><input type="number" class="sim-input" id="sim-liters" value="500" min="1" oninput="buildSim();buildBloc5();"></div>
-            <p style="font-size:.58rem;color:var(--muted);line-height:1.5;margin-top:2px">Carburant, enseigne et zone issus des filtres ci-dessus.</p>
+            <p style="font-size:.65rem;color:var(--muted);line-height:1.6;margin-top:4px">Carburant, enseigne et zone issus des filtres ci-dessus.</p>
           </div>
           <div class="sim-result">
             <div class="sim-result-title">Résultat</div>
             <div class="sim-row"><span class="sim-row-lbl">Prix fournisseur</span><span class="sim-row-val r" id="sim-current-price">—</span></div>
             <div class="sim-row"><span class="sim-row-lbl">Prix Qivia</span><span class="sim-row-val g" id="sim-best-price">—</span></div>
+            <div class="sim-row"><span class="sim-row-lbl">Budget actuel</span><span class="sim-row-val r" id="sim-budget-current">—</span></div>
+            <div class="sim-row"><span class="sim-row-lbl">Budget Qivia</span><span class="sim-row-val g" id="sim-budget-qivia">—</span></div>
             <div class="sim-saving" id="sim-saving-row" style="display:none">
               <div><div class="sim-saving-lbl">Économie mensuelle</div><div class="sim-saving-sub" id="sim-saving-annual"></div></div>
               <div class="sim-saving-val" id="sim-saving-val">—</div>
@@ -190,7 +231,7 @@ select.fs:focus{border-color:var(--green);}
         </div>
       </div>
       <!-- Bloc 5 bas -->
-      <div class="cell" style="flex:1;min-height:0;padding:12px 14px;">
+      <div class="cell" style="flex:1;min-height:0;overflow:hidden;">
         <div class="cell-title"><div class="cell-num">5</div><h2>Résumé</h2></div>
         <div class="summary-grid">
           <div class="sum-item"><div class="sum-lbl">Zone</div><div class="sum-val" id="b5-zone">France entière</div></div>
@@ -239,7 +280,20 @@ let GF={fuel:'gazole_prix',region:'',dept:'',period:'7',brand:''};
 
 function getZoneLabel(){return GF.dept||GF.region||'France entière';}
 function getBrandDaily(){
-  if(GF.dept&&DATA.dept_daily&&DATA.dept_daily.length) return DATA.dept_daily.filter(r=>r.department===GF.dept);
+  // Si département sélectionné : filtrer brand_region_daily par région des stations du dept
+  // ou fallback sur brand_daily national
+  if(GF.dept){
+    if(DATA.brand_region_daily&&DATA.brand_region_daily.length){
+      // Trouver la région du département via les stations
+      const stInDept=DATA.stations.filter(s=>String(s.department||'').trim()===String(GF.dept).trim());
+      const regions=new Set(stInDept.map(s=>s.region).filter(Boolean));
+      if(regions.size>0){
+        const region=[...regions][0]; // prendre la première région
+        return DATA.brand_region_daily.filter(r=>r.region===region);
+      }
+    }
+    return DATA.brand_daily; // fallback national
+  }
   if(GF.region&&DATA.brand_region_daily&&DATA.brand_region_daily.length) return DATA.brand_region_daily.filter(r=>r.region===GF.region);
   return DATA.brand_daily;
 }
@@ -410,6 +464,16 @@ function buildBloc5(){
 }
 
 boot();
+</script>
+<script>
+function toggleNav(){
+  const dd = document.getElementById('nav-dropdown');
+  dd.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest('.nav-wrap'))
+    document.getElementById('nav-dropdown').classList.remove('open');
+});
 </script>
 </body>
 </html>
