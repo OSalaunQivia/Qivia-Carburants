@@ -332,15 +332,10 @@ def fetch_dkv_ids():
     par code postal + adresse avec nos CSV de stations."""
     import pandas as _pd
 
-    # Use cache if less than 30 days old
+    # Supprimer le cache pour forcer rebuild depuis DKV_stations.csv
     if os.path.exists(DKV_IDS_CACHE):
-        age = (datetime.datetime.now().timestamp() - os.path.getmtime(DKV_IDS_CACHE)) / 86400
-        if age < 30:
-            with open(DKV_IDS_CACHE) as f:
-                ids = set(f.read().splitlines())
-            ids.discard("")
-            print(f"[DKV] {len(ids)} provider_ids depuis cache ({age:.1f}j)")
-            return ids
+        os.remove(DKV_IDS_CACHE)
+        print("[DKV] Cache supprimé — rebuild depuis DKV_stations.csv")
 
     if not os.path.exists(DKV_STATIONS_FILE):
         print(f"[DKV] Fichier {DKV_STATIONS_FILE} introuvable — fallback brand")
@@ -404,6 +399,9 @@ def fetch_dkv_ids():
         matched_ids = set()
         no_match = 0
 
+        score_threshold = 0.2  # seuil réduit pour plus de matches
+        no_postal = 0
+
         for _, row in df_dkv.iterrows():
             postal = str(row[postal_col]).split('.')[0].zfill(5)
             dkv_addr = _normalize(row[addr_col])
@@ -411,26 +409,33 @@ def fetch_dkv_ids():
 
             candidates = lookup.get(postal, [])
             if not candidates:
-                no_match += 1
+                no_postal += 1
                 continue
 
             best_score, best_pid = 0.0, None
             for c in candidates:
                 our_words = set(c['addr'].split()) - NOISE
                 if not dkv_words or not our_words:
+                    # Si pas d'adresse DKV mais 1 seul candidat → match
+                    if len(candidates) == 1:
+                        best_pid = c['pid']
+                        best_score = 1.0
                     continue
                 score = len(dkv_words & our_words) / max(len(dkv_words), len(our_words))
                 if score > best_score:
                     best_score, best_pid = score, c['pid']
 
-            if best_score >= 0.3 and best_pid:
+            if best_score >= score_threshold and best_pid:
                 matched_ids.add(best_pid)
             elif len(candidates) == 1:
+                # 1 seul candidat dans ce code postal → on le prend
                 matched_ids.add(candidates[0]['pid'])
             else:
                 no_match += 1
 
-        print(f"[DKV] {len(matched_ids)} provider_ids matchés ({no_match} sans correspondance)")
+        print(f"[DKV] {len(matched_ids)} provider_ids matchés")
+        print(f"[DKV] Sans code postal: {no_postal}, sans match adresse: {no_match}")
+        print(f"[DKV] Colonnes utilisées: postal={postal_col}, adresse={addr_col}")
 
         with open(DKV_IDS_CACHE, "w") as f:
             f.write("\n".join(sorted(matched_ids)))
