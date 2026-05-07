@@ -7,11 +7,6 @@ génère le CSV du jour et qivia_data.json.
 
 import json, os, time, datetime, requests, pandas as pd, glob, re
 
-DKV_PDF_URL = (
-    "https://my.dkv-mobility.com/apidnext/geo-static-content-service/v1/"
-    "station-network,pdf,FR,en/DKV_FR_sortByAddr_en.pdf"
-    "?_gl=1*ad0ek3*_gcl_au*MTc0NzQwODIwMy4xNzc4MTQ1NDE5*FPAU*MTc0NzQwODIwMy4xNzc4MTQ1NDE5"
-)
 DKV_IDS_CACHE = "dkv_ids_cache.txt"
 
 API_URL = (
@@ -323,59 +318,52 @@ def fetch_total_ids():
 
 
 def fetch_dkv_ids():
-    """Télécharge le PDF DKV et extrait tous les numéros de stations."""
-    import io
+    """Récupère les IDs stations DKV depuis le fichier Overpass (colonne tags/payment:dkv)."""
+    import pandas as _pd
 
-    # Use cache if less than 7 days old
+    # Delete old cache to force rebuild (cache was storing wrong IDs)
     if os.path.exists(DKV_IDS_CACHE):
-        age = (datetime.datetime.now().timestamp() - os.path.getmtime(DKV_IDS_CACHE)) / 86400
-        if age < 7:
-            with open(DKV_IDS_CACHE) as f:
-                ids = set(f.read().splitlines())
-            ids.discard("")
-            print(f"[DKV] {len(ids)} IDs depuis cache ({age:.1f}j)")
-            return ids
+        os.remove(DKV_IDS_CACHE)
+        print("[DKV] Cache supprimé pour rebuild")
 
-    print("[DKV] Téléchargement du PDF DKV...")
+    if not os.path.exists(OVERPASS_BRAND_FILE):
+        print(f"[DKV] Fichier {OVERPASS_BRAND_FILE} introuvable")
+        return set()
+
     try:
-        r = requests.get(DKV_PDF_URL, timeout=120, headers={"User-Agent": "Mozilla/5.0"})
-        r.raise_for_status()
-        print(f"[DKV] PDF téléchargé ({len(r.content)//1024} Ko)")
+        df = _pd.read_csv(OVERPASS_BRAND_FILE, low_memory=False)
+        ref_col = 'tags/ref:FR:prix-carburants'
+        dkv_col = 'tags/payment:dkv'
 
-        # Try with pdfplumber first (best for structured PDFs)
-        ids = set()
-        try:
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(r.content)) as pdf:
-                print(f"[DKV] {len(pdf.pages)} pages")
-                for page in pdf.pages:
-                    text = page.extract_text() or ""
-                    found = re.findall(r'DKV No[: ]*([0-9]{6,8})', text)
-                    ids.update(found)
-            print(f"[DKV] {len(ids)} IDs extraits via pdfplumber")
-        except ImportError:
-            pass
+        print(f"[DKV] Colonnes disponibles: {[c for c in df.columns if 'dkv' in c.lower() or 'ref' in c.lower() or 'payment' in c.lower()]}")
 
-        # Fallback: raw binary search
-        if not ids:
-            text = r.content.decode("latin-1", errors="ignore")
-            ids = set(re.findall(r'DKV No[: ]*([0-9]{6,8})', text))
-            print(f"[DKV] {len(ids)} IDs extraits via raw text")
+        if dkv_col not in df.columns:
+            print(f"[DKV] Colonne {dkv_col} introuvable")
+            return set()
+        if ref_col not in df.columns:
+            print(f"[DKV] Colonne {ref_col} introuvable")
+            return set()
+
+        mask = df[dkv_col].astype(str).str.lower().str.strip() == 'yes'
+        print(f"[DKV] {mask.sum()} stations avec payment:dkv=yes")
+
+        # Use ref:FR:prix-carburants (NOT the OSM id column)
+        refs = df[mask][ref_col].dropna().astype(str).str.split('.').str[0]
+        ids = set(refs.tolist())
+        ids.discard('')
+        ids.discard('nan')
+        print(f"[DKV] {len(ids)} IDs ref:FR:prix-carburants extraits")
+        print(f"[DKV] Exemples IDs: {list(ids)[:5]}")
 
         if ids:
             with open(DKV_IDS_CACHE, "w") as f:
                 f.write("\n".join(sorted(ids)))
-            print(f"[DKV] Cache sauvegardé: {len(ids)} IDs")
         return ids
 
     except Exception as e:
         print(f"[DKV] Erreur: {e}")
-        if os.path.exists(DKV_IDS_CACHE):
-            with open(DKV_IDS_CACHE) as f:
-                ids = set(f.read().splitlines())
-            ids.discard("")
-            print(f"[DKV] Fallback cache: {len(ids)} IDs")
-            return ids
+        import traceback
+        traceback.print_exc()
         return set()
 
 
