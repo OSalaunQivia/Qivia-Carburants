@@ -550,7 +550,20 @@ def main():
     print(f"[JSON] qivia_data.json ({os.path.getsize('qivia_data.json')//1024} Ko)")
 
     # Pré-calculer les stations DKV via matching adresse
-    fetch_dkv_stations(all_data[["provider_id","postal","address","city"]].drop_duplicates())
+    import glob as _glob
+    csv_files = sorted(_glob.glob(os.path.join(CSV_DIR, "stations_avec_prix_*.csv")))
+    if csv_files:
+        import pandas as _pd2
+        dfs_dkv = []
+        for cf in csv_files:
+            try:
+                tmp = _pd2.read_csv(cf, low_memory=False, usecols=["provider_id","postal","address","city"])
+                dfs_dkv.append(tmp)
+            except Exception:
+                pass
+        if dfs_dkv:
+            all_data_dkv = _pd2.concat(dfs_dkv, ignore_index=True).drop_duplicates(subset="provider_id")
+            fetch_dkv_stations(all_data_dkv)
     # Regénérer la carte avec les prix à jour
     generate_carte(data["stations"])
 
