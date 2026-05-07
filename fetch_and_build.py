@@ -470,6 +470,18 @@ def generate_carte(stations, template_path="qivia_carte_template.html", output_p
     }
     FUELS = list(FUELS_FR.keys())
 
+    def _clean(v):
+        """Nettoie une valeur pour JSON/JS: supprime nan, contrôle les caractères."""
+        if v is None: return ""
+        s = str(v).strip()
+        if s.lower() in ("nan", "none", "nat"): return ""
+        # Remove JS/JSON-breaking characters
+        s = s.replace("\\", " ")   # backslashes
+        s = s.replace('"', "'")      # double quotes -> single quotes
+        s = s.replace("</script>", "")
+        s = s.replace("\r", " ").replace("\n", " ")
+        return s.strip()
+
     # Build station objects in carte format
     carte_stations = []
     for s in stations:
@@ -480,16 +492,16 @@ def generate_carte(stations, template_path="qivia_carte_template.html", output_p
         carte_stations.append({
             "lat":        s["lat"],
             "lon":        s["lng"],
-            "address":    s.get("address", ""),
-            "city":       s.get("city", ""),
-            "postal":     s.get("postal", ""),
-            "region":     s.get("region", ""),
-            "department": s.get("department", ""),
-            "name":       s.get("name", ""),
-            "brand":      s.get("brand", ""),
+            "address":    _clean(s.get("address", "")),
+            "city":       _clean(s.get("city", "")),
+            "postal":     _clean(s.get("postal", "")),
+            "region":     _clean(s.get("region", "")),
+            "department": _clean(s.get("department", "")),
+            "name":       _clean(s.get("name", "")),
+            "brand":      _clean(s.get("brand", "")),
             "fuels":      fuels_str,
             "prices":     prices,
-            "uuid":       s.get("uuid", ""),
+            "uuid":       _clean(s.get("uuid", "")),
         })
 
     # TotalEnergies network via Overpass OSM
@@ -531,15 +543,25 @@ def generate_carte(stations, template_path="qivia_carte_template.html", output_p
                         if s.get('brand','').lower().strip() in DKV_FALLBACK]
         print(f"[DKV] {len(dkv_stations)} stations (fallback brand)")
 
-    qivia_js  = _json.dumps(carte_stations, ensure_ascii=False, separators=(",",":"))
-    dkv_js    = _json.dumps(dkv_stations,   ensure_ascii=False, separators=(",",":"))
-    total_js  = _json.dumps(total_stations, ensure_ascii=False, separators=(",",":"))
+    qivia_js  = _json.dumps(carte_stations, ensure_ascii=True, separators=(",",":"))
+    dkv_js    = _json.dumps(dkv_stations,   ensure_ascii=True, separators=(",",":"))
+    total_js  = _json.dumps(total_stations, ensure_ascii=True, separators=(",",":"))
 
     data_block = (
         f"const QIVIA_DATA = {qivia_js};\n"
         f"const DKV_DATA = {dkv_js};\n"
         f"const TOTAL_DATA = {total_js};"
     )
+
+    # Validate JSON before writing
+    try:
+        _json.loads(qivia_js)
+        _json.loads(dkv_js)
+        _json.loads(total_js)
+        print("[Carte] JSON validé ✓")
+    except Exception as e:
+        print(f"[Carte] ERREUR JSON: {e} — carte non regénérée")
+        return
 
     html = template.replace(
         "/* ###QIVIA_DATA_START### */\n/* ###QIVIA_DATA_END### */",
