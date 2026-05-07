@@ -8,6 +8,7 @@ génère le CSV du jour et qivia_data.json.
 import json, os, time, datetime, requests, pandas as pd, glob, re
 
 DKV_IDS_CACHE = "dkv_ids_cache.txt"
+DKV_STATIONS_FILE = "DKV_stations.csv"  # fichier CSV avec No ID, Brand, Adresse, Code Postal, Ville
 
 API_URL = (
     "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets"
@@ -317,121 +318,134 @@ def fetch_total_ids():
         return set()
 
 
-def _normalize_addr(s):
-    """Normalise une adresse pour le matching."""
+def _normalize(s):
     if not s or str(s).lower() in ('nan','none',''): return ''
+    import re as _re
     s = str(s).upper().strip()
-    s = re.sub(r'[^\w\s]', ' ', s)
-    s = re.sub(r'\s+', ' ', s)
-    for old_w, new_w in [('AVENUE','AV'),('BOULEVARD','BD'),('BLD','BD'),
-                          ('ROUTE','RTE'),('SAINT','ST'),('SAINTE','STE'),
-                          ('PLACE','PL'),('CHEMIN','CHE'),('IMPASSE','IMP')]:
-        s = s.replace(old_w, new_w)
+    s = _re.sub(r'[^\w\s]', ' ', s)
+    s = _re.sub(r'\s+', ' ', s)
     return s.strip()
 
-def _addr_score(a1, a2):
-    """Score de similarité entre deux adresses (0-1)."""
-    d1 = set(_normalize_addr(a1).split()) - {'DE','DU','LA','LE','LES','DES','EN','AU','A','N','RN','D'}
-    d2 = set(_normalize_addr(a2).split()) - {'DE','DU','LA','LE','LES','DES','EN','AU','A','N','RN','D'}
-    if not d1 or not d2: return 0.0
-    return len(d1 & d2) / max(len(d1), len(d2))
-
-def fetch_dkv_stations(all_stations_df):
-    """Identifie les stations DKV par matching postal+adresse avec le PDF DKV.
-    
-    Le PDF DKV est parsé depuis le fichier texte DKV_FR_stations.txt s'il existe,
-    sinon utilise le fichier Overpass avec payment:dkv=yes.
-    all_stations_df: DataFrame avec colonnes provider_id, postal, address, city
-    """
+def fetch_dkv_ids():
+    """Identifie les provider_ids de nos stations qui correspondent aux stations DKV.
+    Utilise DKV_stations.csv (No ID, Adresse, Code Postal) et fait un matching
+    par code postal + adresse avec nos CSV de stations."""
     import pandas as _pd
 
-    # Use cache
+    # Use cache if less than 30 days old
     if os.path.exists(DKV_IDS_CACHE):
         age = (datetime.datetime.now().timestamp() - os.path.getmtime(DKV_IDS_CACHE)) / 86400
-        if age < 7:
+        if age < 30:
             with open(DKV_IDS_CACHE) as f:
                 ids = set(f.read().splitlines())
             ids.discard("")
-            print(f"[DKV] {len(ids)} IDs depuis cache ({age:.1f}j)")
+            print(f"[DKV] {len(ids)} provider_ids depuis cache ({age:.1f}j)")
             return ids
 
-    # Build lookup: postal -> list of (provider_id, address)
-    lookup = {}
-    for _, r in all_stations_df.iterrows():
-        postal = str(r.get('postal','')).split('.')[0].zfill(5)
-        if postal not in lookup:
-            lookup[postal] = []
-        lookup[postal].append({
-            'provider_id': str(r.get('provider_id','')).split('.')[0],
-            'address': str(r.get('address','')),
-            'city': str(r.get('city','')),
-        })
-
-    # Try Overpass file with payment:dkv=yes
-    dkv_entries = []
-    if os.path.exists(OVERPASS_BRAND_FILE):
-        try:
-            df_ov = _pd.read_csv(OVERPASS_BRAND_FILE, low_memory=False)
-            dkv_col = 'tags/payment:dkv'
-            if dkv_col in df_ov.columns:
-                mask = df_ov[dkv_col].astype(str).str.lower().str.strip() == 'yes'
-                dkv_rows = df_ov[mask]
-                print(f"[DKV] {len(dkv_rows)} stations payment:dkv=yes dans Overpass")
-                for _, r in dkv_rows.iterrows():
-                    postal = str(r.get('tags/postal_code', r.get('tags/addr:postcode',''))).zfill(5)
-                    addr   = str(r.get('tags/addr:street','') or r.get('tags/address',''))
-                    city   = str(r.get('tags/addr:city',''))
-                    dkv_entries.append({'postal': postal, 'address': addr, 'city': city})
-        except Exception as e:
-            print(f"[DKV] Erreur Overpass: {e}")
-
-    if not dkv_entries:
-        print("[DKV] Aucune entrée DKV trouvée — fallback brand")
+    if not os.path.exists(DKV_STATIONS_FILE):
+        print(f"[DKV] Fichier {DKV_STATIONS_FILE} introuvable — fallback brand")
         return set()
 
-    # Match by postal + address score
-    matched_ids = set()
-    no_match = 0
-    for entry in dkv_entries:
-        postal = entry['postal']
-        candidates = lookup.get(postal, [])
-        if not candidates:
-            no_match += 1
-            continue
-        # Score each candidate
-        best_id, best_score = None, 0.0
-        for c in candidates:
-            score = _addr_score(entry['address'], c['address'])
-            if score > best_score:
-                best_score, best_id = score, c['provider_id']
-        if best_score >= 0.3 and best_id:
-            matched_ids.add(best_id)
-        else:
-            # Fallback: if only 1 station in that postal code, take it
-            if len(candidates) == 1:
-                matched_ids.add(candidates[0]['provider_id'])
+    try:
+        # Load DKV stations file
+        df_dkv = None
+        for sep in [',', ';', '\t']:
+            try:
+                tmp = _pd.read_csv(DKV_STATIONS_FILE, sep=sep,
+                                   encoding='utf-8-sig', low_memory=False)
+                if len(tmp.columns) >= 3:
+                    df_dkv = tmp
+                    break
+            except Exception:
+                continue
+
+        if df_dkv is None:
+            print("[DKV] Impossible de lire le fichier")
+            return set()
+
+        print(f"[DKV] {len(df_dkv)} stations dans {DKV_STATIONS_FILE}")
+        print(f"[DKV] Colonnes: {list(df_dkv.columns[:6])}")
+
+        # Detect columns
+        cols = [c.lower().strip() for c in df_dkv.columns]
+        addr_col   = df_dkv.columns[[i for i,c in enumerate(cols) if 'adresse' in c or 'address' in c][0]] if any('adresse' in c or 'address' in c for c in cols) else df_dkv.columns[2]
+        postal_col = df_dkv.columns[[i for i,c in enumerate(cols) if 'postal' in c or 'cp' in c or 'code' in c][0]] if any('postal' in c or 'cp' in c or 'code' in c for c in cols) else df_dkv.columns[3]
+
+        # Load all our CSV stations for matching
+        import glob as _glob
+        csv_files = sorted(_glob.glob(os.path.join(CSV_DIR, "stations_avec_prix_*.csv")))
+        dfs = []
+        for cf in csv_files:
+            try:
+                tmp = _pd.read_csv(cf, low_memory=False,
+                                   usecols=["provider_id","postal","address"])
+                dfs.append(tmp)
+            except Exception:
+                pass
+
+        if not dfs:
+            return set()
+
+        our_df = _pd.concat(dfs).drop_duplicates(subset="provider_id")
+        our_df['postal_clean'] = our_df['postal'].astype(str).str.split('.').str[0].str.zfill(5)
+        our_df['addr_norm'] = our_df['address'].apply(_normalize)
+        our_df['provider_clean'] = our_df['provider_id'].astype(str).str.split('.').str[0]
+
+        # Build lookup: postal -> list of {provider_id, addr_norm}
+        lookup = {}
+        for _, r in our_df.iterrows():
+            p = r['postal_clean']
+            if p not in lookup:
+                lookup[p] = []
+            lookup[p].append({'pid': r['provider_clean'], 'addr': r['addr_norm']})
+
+        NOISE = {'DE','DU','LA','LE','LES','DES','EN','AU','A','N','RN','D','L'}
+
+        matched_ids = set()
+        no_match = 0
+
+        for _, row in df_dkv.iterrows():
+            postal = str(row[postal_col]).split('.')[0].zfill(5)
+            dkv_addr = _normalize(row[addr_col])
+            dkv_words = set(dkv_addr.split()) - NOISE
+
+            candidates = lookup.get(postal, [])
+            if not candidates:
+                no_match += 1
+                continue
+
+            best_score, best_pid = 0.0, None
+            for c in candidates:
+                our_words = set(c['addr'].split()) - NOISE
+                if not dkv_words or not our_words:
+                    continue
+                score = len(dkv_words & our_words) / max(len(dkv_words), len(our_words))
+                if score > best_score:
+                    best_score, best_pid = score, c['pid']
+
+            if best_score >= 0.3 and best_pid:
+                matched_ids.add(best_pid)
+            elif len(candidates) == 1:
+                matched_ids.add(candidates[0]['pid'])
             else:
                 no_match += 1
 
-    print(f"[DKV] {len(matched_ids)} stations matchées ({no_match} sans correspondance)")
+        print(f"[DKV] {len(matched_ids)} provider_ids matchés ({no_match} sans correspondance)")
 
-    if matched_ids:
         with open(DKV_IDS_CACHE, "w") as f:
             f.write("\n".join(sorted(matched_ids)))
-    return matched_ids
+        return matched_ids
+
+    except Exception as e:
+        print(f"[DKV] Erreur: {e}")
+        import traceback
+        traceback.print_exc()
+        return set()
 
 
-def fetch_dkv_ids():
-    """Wrapper pour compatibilité — charge le cache ou retourne set vide."""
-    if os.path.exists(DKV_IDS_CACHE):
-        age = (datetime.datetime.now().timestamp() - os.path.getmtime(DKV_IDS_CACHE)) / 86400
-        if age < 7:
-            with open(DKV_IDS_CACHE) as f:
-                ids = set(f.read().splitlines())
-            ids.discard("")
-            print(f"[DKV] {len(ids)} IDs depuis cache ({age:.1f}j)")
-            return ids
-    return set()
+def fetch_dkv_stations(all_stations_df):
+    """Alias pour compatibilité."""
+    return fetch_dkv_ids()
 
 
 def generate_carte(stations, template_path="qivia_carte_template.html", output_path="qivia_carte.html"):
@@ -549,21 +563,8 @@ def main():
         json.dump(data, fp, ensure_ascii=False, separators=(",",":"))
     print(f"[JSON] qivia_data.json ({os.path.getsize('qivia_data.json')//1024} Ko)")
 
-    # Pré-calculer les stations DKV via matching adresse
-    import glob as _glob
-    csv_files = sorted(_glob.glob(os.path.join(CSV_DIR, "stations_avec_prix_*.csv")))
-    if csv_files:
-        import pandas as _pd2
-        dfs_dkv = []
-        for cf in csv_files:
-            try:
-                tmp = _pd2.read_csv(cf, low_memory=False, usecols=["provider_id","postal","address","city"])
-                dfs_dkv.append(tmp)
-            except Exception:
-                pass
-        if dfs_dkv:
-            all_data_dkv = _pd2.concat(dfs_dkv, ignore_index=True).drop_duplicates(subset="provider_id")
-            fetch_dkv_stations(all_data_dkv)
+    # Pré-calculer les stations DKV
+    fetch_dkv_ids()
     # Regénérer la carte avec les prix à jour
     generate_carte(data["stations"])
 
