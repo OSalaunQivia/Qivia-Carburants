@@ -200,6 +200,7 @@ def build_aggregates(df):
             brand_daily.append({"date":str(dt.date()),"brand":str(brand),**fr(g)})
 
     latest = all_data[all_data["snapshot_date"]==dates_sorted[-1]]
+    n_stations_total = int(latest["provider_id"].nunique()) if "provider_id" in latest else len(latest)
     stations = []
     for _,r in latest.iterrows():
         if all(pd.isna(r.get(f)) for f in FUELS): continue
@@ -238,7 +239,7 @@ def build_aggregates(df):
     return {
         "meta": {
             "generated":     datetime.date.today().isoformat(),
-            "n_stations":    int(all_data["provider_id"].nunique()) if "provider_id" in all_data else len(latest),
+            "n_stations":    n_stations_total,
             "n_snapshots":   len(dates_sorted),
             "latest_date":   str(dates_sorted[-1].date()),
             "earliest_date": str(dates_sorted[0].date()),
