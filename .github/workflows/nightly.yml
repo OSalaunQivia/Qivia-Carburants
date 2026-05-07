@@ -2,7 +2,7 @@ name: Qivia — Mise à jour quotidienne
 
 on:
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '1 0 * * *'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install requests pandas
+        run: pip install requests pandas pdfplumber
 
       - name: Fetch data & build JSON
         run: python fetch_and_build.py
