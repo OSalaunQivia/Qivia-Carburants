@@ -492,21 +492,25 @@ def _token_score(a, b):
 def generate_geojson(api_df, output_path=GEOJSON_OUT):
     """
     Génère stations_lite.geojson :
-      1. 9 764 stations API enrichies par Stations_essences.xlsx (ID match + adresse match DKV)
-      2. Stations DKV géocodées conservées depuis la version précédente du fichier
-         (celles dont l'id commence par DKV_SOURCE_)
+      1. Stations API enrichies par Stations_essences.xlsx (ID match + adresse match DKV)
+      2. Stations DKV géocodées conservées depuis la version précédente (DKV_SOURCE_)
+
+    Colonnes DataFrame -> GeoJSON :
+      provider_id -> id | address -> adresse | city -> ville
+      postal -> cp | department -> departement | region -> region
     """
     print("[GeoJSON] Génération de stations_lite.geojson…")
 
     # ── Chargement Excel ──────────────────────────────────────────────────────
-    xl_lookup   = {}   # id -> row
-    xl_dkv_rows = []   # lignes DKV sans ID gouvernemental
+    xl_lookup   = {}
+    xl_dkv_rows = []
     if os.path.exists(EXCEL_FILE):
         xl = pd.read_excel(EXCEL_FILE)
         xl['ID'] = xl['ID'].astype(str).str.strip()
         xl = xl.drop_duplicates('ID', keep='first')
         xl_lookup = xl.set_index('ID').to_dict('index')
-        gov_ids   = set(str(r) for r in api_df['id'].dropna())
+        # IDs gouvernementaux = provider_id sans décimale
+        gov_ids = set(str(int(float(x))) for x in api_df['provider_id'].dropna())
         xl_dkv_rows = xl[(xl['DKV']==1) & (~xl['ID'].isin(gov_ids))].to_dict('records')
     else:
         print(f"  ⚠ {EXCEL_FILE} introuvable — enrichissement désactivé")
@@ -514,18 +518,36 @@ def generate_geojson(api_df, output_path=GEOJSON_OUT):
     # ── Index API par CP pour matching adresse DKV ────────────────────────────
     geo_by_cp = {}
     for _, row in api_df.iterrows():
-        cp = str(row.get('cp','')).split('.')[0]
-        geo_by_cp.setdefault(cp, []).append((_normalize(str(row.get('adresse',''))), row))
+        cp = str(row.get('postal','')).split('.')[0]
+        geo_by_cp.setdefault(cp, []).append((_normalize(str(row.get('address',''))), row))
 
     # ── Étape 1 : stations API + enrichissement Excel ──────────────────────────
     features   = []
-    marked_dkv = set()   # IDs déjà marqués DKV via Excel ou adresse
+    marked_dkv = set()
 
     for _, row in api_df.iterrows():
-        sid  = str(row.get('id',''))
+        try:
+            sid = str(int(float(row.get('provider_id', 0))))
+        except (TypeError, ValueError):
+            sid = str(row.get('provider_id',''))
+
         xl_r = xl_lookup.get(sid, {})
-        props = {k: (None if pd.isna(row.get(k)) else row.get(k)) for k in
-                 ['id','adresse','ville','cp','departement','region'] + FUELS_GEO}
+
+        # Mapping colonnes DataFrame -> propriétés GeoJSON
+        def _val(v):
+            return None if (v is None or (isinstance(v, float) and pd.isna(v))) else v
+
+        props = {
+            'id':          sid,
+            'adresse':     _val(row.get('address')),
+            'ville':       _val(row.get('city')),
+            'cp':          str(row.get('postal','')).split('.')[0],
+            'departement': _val(row.get('department')),
+            'region':      _val(row.get('region')),
+        }
+        for f in FUELS_GEO:
+            props[f] = _val(row.get(f))
+
         props['brand']          = str(xl_r.get('Brand', row.get('brand','Autre')) or 'Autre')
         props['dkv']            = int(xl_r.get('DKV', 0) or 0)
         props['total_energies'] = int(xl_r.get('TotalEnergies', 0) or 0)
@@ -556,7 +578,11 @@ def generate_geojson(api_df, output_path=GEOJSON_OUT):
         for addr_geo, api_row in candidates:
             sc = _token_score(addr_excel, addr_geo)
             if sc > best_score:
-                best_score, best_sid = sc, str(api_row.get('id',''))
+                try:
+                    best_sid = str(int(float(api_row.get('provider_id', 0))))
+                except (TypeError, ValueError):
+                    best_sid = str(api_row.get('provider_id',''))
+                best_score = sc
         if best_score >= 0.5 and best_sid and best_sid not in marked_dkv:
             for f in features:
                 if str(f['properties'].get('id','')) == best_sid:
