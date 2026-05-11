@@ -329,7 +329,7 @@ const BRAND_LOGO_MAP = {
 };
 // ═══════════════════════════════════════
 // DONNÉES — chargées depuis le GeoJSON gouvernemental
-// (stations_lite.geojson)
+// (prix-des-carburants-en-france-flux-instantane-v2.geojson)
 // ═══════════════════════════════════════
 let QIVIA_DATA = [];
 let DKV_DATA   = [];
@@ -368,47 +368,23 @@ function normalizeGovFeature(feature) {
     if (!isNaN(v) && v > 0) prices[dest] = v;
   }
 
-  // Détection de marque grossière depuis le nom/adresse
-  function detectBrand(adresse = '') {
-    const a = adresse.toLowerCase();
-    const brandMap = [
-      ['leclerc',      'Leclerc'],
-      ['carrefour',    'Carrefour'],
-      ['intermarché',  'Intermarché'],
-      ['intermarche',  'Intermarché'],
-      ['super u',      'Super U'],
-      ['système u',    'Super U'],
-      ['auchan',       'Auchan'],
-      ['casino',       'Casino'],
-      ['total',        'TotalEnergies'],
-      ['bp ',          'BP'],
-      ['shell',        'Shell'],
-      ['esso',         'Esso'],
-      ['netto',        'Netto'],
-      ['dyneff',       'Dyneff'],
-      ['avia',         'Avia'],
-      ['elan',         'Elan'],
-    ];
-    for (const [pattern, label] of brandMap) {
-      if (a.includes(pattern)) return label;
-    }
-    return 'Autre';
-  }
-
+  // Marque, DKV et TotalEnergies viennent directement du GeoJSON enrichi (jointure Excel)
   const adresse = p.adresse || '';
   return {
-    uuid:       String(p.id || ''),
-    name:       adresse.slice(0, 60),
-    address:    adresse,
-    city:       p.ville  || '',
-    postal:     p.cp     || '',
-    department: p.departement || '',
-    region:     p.region || '',
-    brand:      detectBrand(adresse),
+    uuid:           String(p.id || ''),
+    name:           adresse.slice(0, 60),
+    address:        adresse,
+    city:           p.ville        || '',
+    postal:         p.cp           || '',
+    department:     p.departement  || '',
+    region:         p.region       || '',
+    brand:          p.brand        || 'Autre',
+    dkv:            Number(p.dkv)  === 1,
+    total_energies: Number(p.total_energies) === 1,
     lat,
-    lon:        lng,
+    lon:            lng,
     prices,
-    fuels:      Object.keys(prices).map(k => FUEL_KEYS_FR[k] || k),
+    fuels:          Object.keys(prices).map(k => FUEL_KEYS_FR[k] || k),
   };
 }
 
@@ -425,7 +401,7 @@ async function loadGeoJSON() {
   const loader = document.getElementById('geojson-loader');
   try {
     if (loader) loader.style.display = 'flex';
-    const res = await fetch('stations_lite.geojson');
+    const res = await fetch('prix-des-carburants-en-france-flux-instantane-v2.geojson');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const gj = await res.json();
 
@@ -433,10 +409,8 @@ async function loadGeoJSON() {
     const stations = features.map(normalizeGovFeature).filter(Boolean);
 
     QIVIA_DATA = stations;
-    DKV_DATA   = stations;   // même dataset — les onglets DKV/Total filtreront par brand
-    TOTAL_DATA = stations.filter(s =>
-      ['TotalEnergies','Elan'].includes(s.brand)
-    );
+    DKV_DATA   = stations.filter(s => s.dkv === true);
+    TOTAL_DATA = stations.filter(s => s.total_energies === true);
 
     if (loader) loader.style.display = 'none';
     console.log(`[GeoJSON] ${stations.length} stations chargées`);
@@ -450,7 +424,7 @@ async function loadGeoJSON() {
         <small style="color:rgba(255,255,255,.4)">${err.message}</small><br>
         <small style="color:rgba(255,255,255,.3);margin-top:8px;display:block">
           Vérifiez que le fichier<br>
-          <code>stations_lite.geojson</code><br>
+          <code>prix-des-carburants-en-france-flux-instantane-v2.geojson</code><br>
           est bien dans le même dossier que cette page.
         </small>
       </div>`;
