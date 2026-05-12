@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qivia — Business Case</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+/* ── RESET ── */
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --navy:#0D1117; --green:#00C48C; --green-light:#e6faf4;
+  --bg:#F8F9FB; --white:#fff; --border:#E4E8EF;
+  --text:#1a2332; --muted:#6E7A8A; --card:#fff;
+  --red:#F04E37; --yellow:#F59E0B; --blue:#3B82F6;
+  --font:'Inter',sans-serif;
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);}
+
+/* ── TOPBAR ── */
+#topbar{background:var(--navy);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:200;}
+.logo-wrap img{width:34px;height:34px;border-radius:50%;object-fit:cover;}
+.nav-wrap{position:relative;}
+.nav-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font);}
+.nav-btn:hover{background:rgba(255,255,255,.15);}
+.nav-arrow{font-size:.6rem;color:rgba(255,255,255,.5);}
+.nav-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:10px;min-width:210px;z-index:9999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.nav-dropdown.open{display:block;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;color:rgba(255,255,255,.8);font-size:.8rem;font-weight:500;cursor:pointer;border-radius:8px;margin:4px;text-decoration:none;}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-item.active{background:rgba(0,196,140,.15);color:#00C48C;}
+.nav-item-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+.topbar-right{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.tb-btn{padding:5px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font);border:1px solid rgba(255,255,255,.2);color:#fff;background:rgba(255,255,255,.08);}
+.tb-btn:hover{background:rgba(255,255,255,.15);}
+.tb-btn.primary{background:var(--green);color:var(--navy);border-color:var(--green);}
+.tb-btn.primary:hover{background:#00b37e;}
+.tb-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* ── WIZARD ── */
+.page{max-width:860px;margin:0 auto;padding:36px 20px;}
+.step-bar{display:flex;align-items:center;margin-bottom:44px;}
+.step-node{display:flex;flex-direction:column;align-items:center;}
+.step-circle{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;flex-shrink:0;transition:all .25s;}
+.step-circle.done{background:var(--green);color:#fff;}
+.step-circle.active{background:var(--green);color:#fff;box-shadow:0 0 0 4px rgba(0,196,140,.2);}
+.step-circle.pending{background:var(--border);color:var(--muted);}
+.step-lbl{font-size:.68rem;font-weight:600;color:var(--muted);margin-top:5px;white-space:nowrap;}
+.step-line{flex:1;height:2px;background:var(--border);transition:background .25s;}
+.step-line.done{background:var(--green);}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.card-title{font-size:.95rem;font-weight:700;color:var(--text);margin-bottom:4px;}
+.card-sub{font-size:.78rem;color:var(--muted);margin-bottom:22px;}
+
+/* ── FIELDS ── */
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.field input,.field select,.field textarea{background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 13px;font-family:var(--font);font-size:.87rem;outline:none;transition:border-color .2s;width:100%;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);}
+.field select{cursor:pointer;}
+
+/* ── CHIPS ── */
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;}
+.chip{padding:5px 13px;border-radius:20px;font-size:.78rem;font-weight:600;background:var(--bg);color:var(--muted);cursor:pointer;border:1.5px solid var(--border);transition:all .15s;user-select:none;}
+.chip.sel{background:var(--green-light);color:var(--green);border-color:var(--green);}
+.chip:hover{border-color:var(--green);color:var(--green);}
+
+/* ── ZONES ── */
+.zone-row{display:flex;gap:8px;margin-bottom:8px;}
+.zone-row input{flex:1;}
+.zone-add{padding:9px 16px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.82rem;cursor:pointer;white-space:nowrap;}
+.zone-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 12px;background:var(--green-light);border:1px solid rgba(0,196,140,.3);border-radius:20px;font-size:.78rem;color:var(--green);font-weight:600;}
+.zone-tag button{background:none;border:none;color:var(--green);cursor:pointer;font-size:.9rem;opacity:.6;}
+.zone-tag button:hover{opacity:1;}
+
+/* ── LITRAGE ── */
+.litrage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.litrage-item{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:12px;}
+.litrage-item label{display:block;font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px;}
+.litrage-item .li-row{display:flex;align-items:center;gap:6px;}
+.litrage-item input{flex:1;min-width:0;background:var(--white);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:7px 9px;font-family:var(--font);font-size:.85rem;outline:none;width:100%;}
+.litrage-item input:focus{border-color:var(--green);}
+.litrage-item .unit{font-size:.68rem;color:var(--muted);white-space:nowrap;flex-shrink:0;}
+
+/* ── VEHICLE TABLE ── */
+.veh-table{width:100%;border-collapse:collapse;margin-top:8px;}
+.veh-table th{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;padding:8px 10px;border-bottom:2px solid var(--border);text-align:left;}
+.veh-table td{padding:7px 10px;border-bottom:1px solid var(--border);}
+.veh-table tr:last-child td{border-bottom:none;}
+.veh-table input{width:80px;background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:5px 8px;font-family:var(--font);font-size:.85rem;outline:none;text-align:center;}
+.veh-table input:focus{border-color:var(--green);}
+
+/* ── ADD BTN ── */
+.add-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border:1.5px dashed var(--border);border-radius:10px;color:var(--muted);font-size:.82rem;font-weight:600;cursor:pointer;width:100%;background:none;transition:all .2s;margin-top:10px;}
+.add-btn:hover{border-color:var(--green);color:var(--green);}
+
+/* ── LOGO FETCH ── */
+.logo-preview{display:flex;align-items:center;gap:16px;margin-top:10px;}
+.logo-box{width:56px;height:56px;border:1.5px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg);overflow:hidden;}
+.logo-box img{max-width:100%;max-height:100%;object-fit:contain;}
+.logo-box .logo-placeholder{font-size:1.2rem;}
+.logo-status{font-size:.75rem;color:var(--muted);}
+
+/* ── CSV UPLOAD ── */
+.upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;margin-top:8px;}
+.upload-zone:hover{border-color:var(--green);background:var(--green-light);}
+.upload-zone input{display:none;}
+.upload-zone .uz-icon{font-size:1.4rem;margin-bottom:4px;}
+.upload-zone .uz-label{font-size:.78rem;color:var(--muted);font-weight:500;}
+.upload-zone .uz-hint{font-size:.7rem;color:rgba(110,122,138,.6);margin-top:2px;}
+
+/* ── BUTTONS ── */
+.btn-row{display:flex;justify-content:space-between;align-items:center;margin-top:28px;}
+.btn-primary{padding:11px 26px;background:var(--green);color:#fff;border:none;border-radius:9px;font-family:var(--font);font-size:.87rem;font-weight:700;cursor:pointer;}
+.btn-primary:hover{background:#00b37e;}
+.btn-secondary{padding:11px 22px;background:var(--white);color:var(--text);border:1.5px solid var(--border);border-radius:9px;font-family:var(--font);font-size:.87rem;font-weight:600;cursor:pointer;}
+.btn-secondary:hover{background:var(--bg);}
+
+/* ── LOADING ── */
+#loading{display:none;text-align:center;padding:80px 0;}
+.spinner{width:38px;height:38px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── REPORT ── */
+#report{display:none;background:var(--bg);padding:0 0 40px;}
+.rpt-page{max-width:860px;margin:0 auto;padding:0 20px;}
+
+/* Report header */
+.rpt-header{background:var(--navy);border-radius:14px;padding:36px;margin:28px 0;display:flex;align-items:center;gap:28px;}
+.rpt-logos{display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.rpt-logo-box{width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.rpt-logo-box img{max-width:100%;max-height:100%;object-fit:contain;}
+.rpt-sep{font-size:1.2rem;color:rgba(255,255,255,.3);}
+.rpt-qivia-logo{width:48px;height:48px;border-radius:12px;overflow:hidden;}
+.rpt-qivia-logo img{width:100%;height:100%;object-fit:cover;}
+.rpt-info h1{font-size:1.6rem;font-weight:900;color:#fff;margin-bottom:4px;}
+.rpt-info .rpt-meta{font-size:.78rem;color:rgba(255,255,255,.5);}
+.rpt-tag{display:inline-block;padding:3px 10px;background:rgba(0,196,140,.2);color:var(--green);border-radius:20px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px;}
+.kpi{background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:18px;text-align:center;}
+.kpi-val{font-size:1.7rem;font-weight:900;color:var(--green);}
+.kpi-lbl{font-size:.68rem;color:var(--muted);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+
+/* Section */
+.section{margin-bottom:36px;}
+.section-title{display:flex;align-items:center;gap:8px;font-size:.95rem;font-weight:800;color:var(--text);margin-bottom:4px;}
+.section-title::before{content:'';width:4px;height:17px;background:var(--green);border-radius:2px;display:block;}
+.section-sub{font-size:.76rem;color:var(--muted);margin-bottom:16px;padding-left:12px;}
+
+/* Tables */
+.tbl-wrap{background:var(--white);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;}
+table.rtbl{width:100%;border-collapse:collapse;}
+table.rtbl th{padding:10px 14px;background:var(--bg);font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:left;border-bottom:1.5px solid var(--border);}
+table.rtbl td{padding:10px 14px;font-size:.82rem;border-bottom:1px solid var(--border);font-weight:500;color:var(--text);}
+table.rtbl tr:last-child td{border-bottom:none;}
+table.rtbl tr:hover td{background:#f9fafb;}
+.td-num{font-weight:700;font-variant-numeric:tabular-nums;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.68rem;font-weight:700;}
+.badge-green{background:var(--green-light);color:var(--green);}
+.badge-red{background:#fff0ee;color:var(--red);}
+.badge-yellow{background:#fffbeb;color:var(--yellow);}
+.badge-blue{background:#eff6ff;color:var(--blue);}
+.badge-gray{background:var(--bg);color:var(--muted);}
+
+/* BC boxes */
+.bc-box{background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:24px;margin-bottom:14px;}
+.bc-box.highlight{border-color:rgba(0,196,140,.4);background:var(--green-light);}
+.bc-box h3{font-size:.9rem;font-weight:700;margin-bottom:10px;color:var(--text);}
+.bc-box p{font-size:.82rem;color:var(--muted);line-height:1.7;margin-bottom:8px;}
+.bc-box p:last-child{margin-bottom:0;}
+.savings-big{font-size:2.2rem;font-weight:900;color:var(--green);line-height:1;margin:10px 0 4px;}
+.savings-lbl{font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+
+/* Map in report */
+.map-container{height:320px;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);}
+
+/* Progress bar */
+.prog-bar{display:flex;align-items:center;gap:8px;}
+.prog-track{flex:1;height:5px;background:var(--bg);border-radius:3px;max-width:120px;}
+.prog-fill{height:100%;background:var(--green);border-radius:3px;}
+
+/* Print */
+@media print{
+  #topbar,.no-print,#wizard-form,#loading{display:none!important;}
+  #report{display:block!important;}
+  body{background:#fff;}
+  .rpt-header{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .map-container{height:250px;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="logo-wrap"><img src="data:image/jpeg;base64,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" style="width:34px;height:34px;border-radius:50%;object-fit:cover;"></div>
+    <div class="nav-wrap">
+      <button class="nav-btn" onclick="toggleNav()">
+        <span>Business Case</span>
+        <span class="nav-arrow">▼</span>
+      </button>
+      <div class="nav-dropdown" id="nav-dropdown">
+        <a class="nav-item" href="qivia_prospect.html">
+          <div class="nav-item-icon" style="background:rgba(0,196,140,.2)">📊</div>
+          Présentation Prospect
+        </a>
+        <a class="nav-item" href="qivia_carte.html">
+          <div class="nav-item-icon" style="background:rgba(45,107,228,.2)">🗺</div>
+          Carte des stations
+        </a>
+        <a class="nav-item active" href="qivia_bc.html">
+          <div class="nav-item-icon" style="background:rgba(245,158,11,.2)">💼</div>
+          Business Case
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="topbar-right no-print">
+    <button class="tb-btn primary" id="btn-pdf" style="display:none" onclick="exportPDF()">⬇ Télécharger PDF</button>
+    <button class="tb-btn" id="btn-reset" style="display:none" onclick="resetForm()">← Nouveau</button>
+  </div>
+</div>
+
+<!-- WIZARD -->
+<div class="page" id="wizard-form">
+  <!-- Step bar -->
+  <div class="step-bar">
+    <div class="step-node"><div class="step-circle active" id="dot-1">1</div><div class="step-lbl">Prospect</div></div>
+    <div class="step-line" id="line-1"></div>
+    <div class="step-node"><div class="step-circle pending" id="dot-2">2</div><div class="step-lbl">Flotte</div></div>
+    <div class="step-line" id="line-2"></div>
+    <div class="step-node"><div class="step-circle pending" id="dot-3">✓</div><div class="step-lbl">Générer</div></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div id="step-1">
+    <div class="card">
+      <div class="card-title">Informations prospect</div>
+      <div class="card-sub">Données collectées lors de la découverte commerciale</div>
+
+      <!-- Nom + logo auto -->
+      <div class="field" style="margin-bottom:16px">
+        <label>Nom de la société</label>
+        <input type="text" id="f-nom" placeholder="Ex: Transport Martin SA" oninput="fetchLogo()">
+        <div class="logo-preview">
+          <div class="logo-box" id="logo-box"><span class="logo-placeholder">🏢</span></div>
+          <div class="logo-status" id="logo-status">Le logo sera cherché automatiquement</div>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-bottom:16px">
+        <div class="field">
+          <label>Prestataire actuel</label>
+          <select id="f-prestataire">
+            <option value="">Sélectionner...</option>
+            <option value="TotalEnergies">TotalEnergies</option><option value="DKV">DKV</option><option value="Leclerc">Leclerc</option><option value="Intermarché">Intermarché</option><option value="Carrefour">Carrefour</option><option value="Super U">Super U</option><option value="BP">BP</option><option value="Shell">Shell</option><option value="Esso">Esso</option><option value="Avia">Avia</option><option value="ENI/Agip">ENI/Agip</option><option value="Netto">Netto</option><option value="Casino">Casino</option><option value="Auchan">Auchan</option><option value="Dyneff">Dyneff</option><option value="Elan">Elan</option><option value="AS24">AS24</option><option value="Edenred">Edenred</option><option value="WEX">WEX</option><option value="UTA">UTA</option><option value="Autre">Autre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Activité</label>
+          <input type="text" id="f-activite" placeholder="Ex: Transport routier, BTP...">
+        </div>
+      </div>
+
+      <!-- Zones géo -->
+      <div class="field" style="margin-bottom:14px">
+        <label>Zones géographiques (département, région, ville)</label>
+        <div class="zone-row">
+          <input type="text" id="zone-input" placeholder="Ex: 75, Bretagne, Lyon..." onkeydown="if(event.key==='Enter'){addZone();event.preventDefault();}">
+          <button class="zone-add" onclick="addZone()">+ Ajouter</button>
+        </div>
+        <div class="chips" id="zones-list" style="margin-top:6px"></div>
+      </div>
+
+      <!-- Agences upload -->
+      <div class="field" style="margin-bottom:14px">
+        <label>Adresses des agences (CSV ou texte)</label>
+        <div class="upload-zone" id="agences-upload-zone" onclick="document.getElementById('agences-file').click()">
+          <input type="file" id="agences-file" accept=".csv,.txt" onchange="loadAgencesFile(event)">
+          <div class="uz-icon">📁</div>
+          <div class="uz-label">Cliquer pour importer ou glisser un fichier CSV</div>
+          <div class="uz-hint">1 adresse par ligne, ou colonne "adresse"</div>
+        </div>
+        <div id="agences-imported" style="margin-top:8px;display:none">
+          <div class="chips" id="agences-chips"></div>
+        </div>
+        <div id="agences-manual" style="margin-top:8px">
+          <div id="agences-list"></div>
+          <button class="add-btn" onclick="addAgence()">+ Ajouter une adresse manuellement</button>
+        </div>
+      </div>
+
+      <!-- Itinéraire -->
+      <div class="field">
+        <label>Itinéraire principal (optionnel)</label>
+        <div class="row2">
+          <input type="text" id="f-route-start" placeholder="Ville de départ">
+          <input type="text" id="f-route-end" placeholder="Ville d'arrivée">
+        </div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:5px">Les stations à moins de 30 km de cet itinéraire seront incluses</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <div></div>
+      <button class="btn-primary" onclick="goStep(2)">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div id="step-2" style="display:none">
+    <div class="card">
+      <div class="card-title">Données de la flotte</div>
+      <div class="card-sub">Informations transmises par mail après la découverte</div>
+
+      <!-- Véhicules -->
+      <div class="field" style="margin-bottom:20px">
+        <label>Composition de la flotte</label>
+        <table class="veh-table">
+          <thead><tr><th>Type</th><th>Nombre de véhicules</th></tr></thead>
+          <tbody id="veh-tbody">
+            <tr><td>🚗 VL (Véhicule léger)</td><td><input type="number" class="veh-input" data-type="VL" placeholder="0" min="0"></td></tr>
+            <tr><td>🚐 Utilitaires</td><td><input type="number" class="veh-input" data-type="Utilitaires" placeholder="0" min="0"></td></tr>
+            <tr><td>🚛 PL / Poids lourds</td><td><input type="number" class="veh-input" data-type="PL" placeholder="0" min="0"></td></tr>
+            <tr><td>🚜 Engins / TP</td><td><input type="number" class="veh-input" data-type="Engins" placeholder="0" min="0"></td></tr>
+            <tr><td>❄️ Véhicules réfrigérés</td><td><input type="number" class="veh-input" data-type="Réfrigérés" placeholder="0" min="0"></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Période -->
+      <div class="field" style="margin-bottom:20px;max-width:200px">
+        <label>Période de référence</label>
+        <select id="f-periode" onchange="updatePeriodLabels()">
+          <option value="mois">Mensuel</option>
+          <option value="annee" selected>Annuel</option>
+        </select>
+      </div>
+
+      <!-- Litrage -->
+      <div class="field">
+        <label>Litrage par carburant (laisser vide si non concerné)</label>
+        <div class="litrage-grid" style="margin-top:8px">
+          <div class="litrage-item"><label>🛢 Gazole</label><div class="li-row"><input type="number" id="l-gazole" placeholder="0" min="0"><span class="unit">L/<span class="plbl">an</span></span></div></div>
+          <div class="litrage-item"><label>⛽ SP95</label><div class="li-row"><input type="number" id="l-sp95" placeholder="0" min="0"><span class="unit">L/<span class="plbl">an</span></span></div></div>
+          <div class="litrage-item"><label>🌿 E10</label><div class="li-row"><input type="number" id="l-e10" placeholder="0" min="0"><span class="unit">L/<span class="plbl">an</span></span></div></div>
+          <div class="litrage-item"><label>⛽ SP98</label><div class="li-row"><input type="number" id="l-sp98" placeholder="0" min="0"><span class="unit">L/<span class="plbl">an</span></span></div></div>
+          <div class="litrage-item"><label>🌾 E85</label><div class="li-row"><input type="number" id="l-e85" placeholder="0" min="0"><span class="unit">L/<span class="plbl">an</span></span></div></div>
+          <div class="litrage-item"><label>💨 GPLc</label><div class="li-row"><input type="number" id="l-gplc" placeholder="0" min="0"><span class="unit">L/<span class="plbl">an</span></span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-secondary" onclick="goStep(1)">← Retour</button>
+      <button class="btn-primary" onclick="generateBC()">🚀 Générer le Business Case</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="page">
+    <div class="spinner"></div>
+    <div style="color:var(--muted);font-size:.87rem" id="load-label">Chargement...</div>
+  </div>
+</div>
+
+<!-- REPORT -->
+<div id="report">
+  <div class="rpt-page">
+
+    <!-- Header -->
+    <div class="rpt-header">
+      <div class="rpt-logos">
+        <div class="rpt-logo-box" id="r-client-logo"><span style="font-size:1.4rem">🏢</span></div>
+        <div class="rpt-sep">×</div>
+        <div class="rpt-qivia-logo"><img src="data:image/jpeg;base64,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"></div>
+      </div>
+      <div class="rpt-info">
+        <div class="rpt-tag">Business Case</div>
+        <h1 id="r-nom">—</h1>
+        <div class="rpt-meta" id="r-meta">—</div>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-val" id="kpi-stations">—</div><div class="kpi-lbl">Stations zone</div></div>
+      <div class="kpi"><div class="kpi-val" id="kpi-dkv">—</div><div class="kpi-lbl">Stations DKV</div></div>
+      <div class="kpi"><div class="kpi-val" id="kpi-economies">—</div><div class="kpi-lbl">Économies estimées</div></div>
+      <div class="kpi"><div class="kpi-val" id="kpi-prix">—</div><div class="kpi-lbl">Prix moyen Gazole</div></div>
+    </div>
+
+    <!-- S1: Prix par réseau -->
+    <div class="section">
+      <div class="section-title">Réseaux les moins chers dans la zone</div>
+      <div class="section-sub" id="sub-zone">—</div>
+      <div class="card" style="padding:20px">
+        <canvas id="chart-prix" height="260"></canvas>
+      </div>
+    </div>
+
+    <!-- S2: Carte -->
+    <div class="section" id="section-map">
+      <div class="section-title">Carte des stations — zone prospect</div>
+      <div class="section-sub" id="sub-map">—</div>
+      <div class="map-container" id="report-map"></div>
+    </div>
+
+    <!-- S3: Tableau récap -->
+    <div class="section">
+      <div class="section-title">Tableau récapitulatif par zone</div>
+      <div class="section-sub">Nb de stations et prix moyen gazole — données CSV du <span id="csv-date-lbl">—</span></div>
+      <div class="tbl-wrap">
+        <table class="rtbl">
+          <thead><tr><th>Réseau</th><th>Stations zone</th><th>Prix moy. Gazole</th><th>Écart / moy.</th><th>Part de marché</th></tr></thead>
+          <tbody id="tbody-recap"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- S4: BC Argumentaire -->
+    <div class="section">
+      <div class="section-title">Business Case — Argumentaire</div>
+      <div class="section-sub" id="bc-sub">—</div>
+      <div id="bc-content"></div>
+    </div>
+
+    <!-- S5: Économies -->
+    <div class="section" id="section-eco" style="display:none">
+      <div class="section-title">Calcul des économies directes</div>
+      <div class="section-sub">Basé sur votre consommation déclarée · 5 réseaux les moins chers</div>
+      <div class="tbl-wrap" style="margin-bottom:14px">
+        <table class="rtbl">
+          <thead><tr><th>Carburant</th><th>Litrage</th><th>Prix actuel estimé</th><th>Prix Qivia moy.</th><th>Économie</th></tr></thead>
+          <tbody id="tbody-eco"></tbody>
+        </table>
+      </div>
+      <div class="bc-box highlight">
+        <div class="savings-lbl">Économie totale estimée</div>
+        <div class="savings-big" id="total-savings">—</div>
+        <div class="savings-lbl" id="savings-period">par an</div>
+      </div>
+    </div>
+
+    <!-- S6: Maillage -->
+    <div class="section">
+      <div class="section-title">Comparaison du maillage réseau</div>
+      <div class="section-sub">Couverture relative — Qivia = référence 100%</div>
+      <div class="tbl-wrap">
+        <table class="rtbl">
+          <thead><tr><th>Réseau</th><th>Stations zone</th><th>Stations France</th><th>Couverture vs Qivia</th></tr></thead>
+          <tbody id="tbody-maillage"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════ STATE ════════════════ */
+let GEO_DATA = null;
+let PRICE_DATA = [];
+let CSV_DATE = '';
+let CHART_OBJ = null;
+let REPORT_MAP = null;
+let PROSPECT = {};
+const zones = [];
+const agences = [];
+let companyLogoSrc = null;
+let logoFetchTimer = null;
+
+/* ═══════════════ BRAND NORMALIZATION ════════════════ */
+const BRAND_MAP = {
+  'e.leclerc':'Leclerc','leclerc':'Leclerc',
+  'e leclerc':'Leclerc',
+  'intermarché':'Intermarché','intermarche':'Intermarché',
+  'intermarche contact':'Intermarché',
+  'totalenergies':'TotalEnergies','total':'TotalEnergies',
+  'total access':'TotalEnergies','total contact':'TotalEnergies',
+  'total excellium':'TotalEnergies','totalenergies access':'TotalEnergies',
+  'bp':'BP','shell':'Shell','esso':'Esso',
+  'esso express':'Esso',
+  'super u':'Super U','u express':'Super U','hyper u':'Super U',
+  'carrefour':'Carrefour','carrefour market':'Carrefour','carrefour contact':'Carrefour',
+  'carrefour city':'Carrefour',
+  'casino':'Casino',
+  'auchan':'Auchan',
+  'netto':'Netto',
+  'aldi':'Aldi','lidl':'Lidl',
+  'avia':'Avia',
+  'eni':'ENI/Agip','agip':'ENI/Agip','eni/agip':'ENI/Agip',
+  'dyneff':'Dyneff','elan':'Elan',
+  'as24':'AS24','dkv':'DKV',
+  'vito':'Vito',
+  'autre':'Autre',
+};
+function normBrand(b) {
+  if(!b) return 'Autre';
+  return BRAND_MAP[b.toLowerCase().trim()] || b.trim();
+}
+
+/* ═══════════════ NAV ════════════════ */
+function toggleNav() {
+  document.getElementById('nav-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest('.nav-wrap')) document.getElementById('nav-dropdown')?.classList.remove('open');
+});
+
+/* ═══════════════ WIZARD ════════════════ */
+function goStep(n) {
+  [1,2].forEach(i => {
+    document.getElementById('step-'+i).style.display = i===n ? '' : 'none';
+    const dot = document.getElementById('dot-'+i);
+    if(dot) dot.className = 'step-circle ' + (i < n ? 'done' : i === n ? 'active' : 'pending');
+    if(i < 2) document.getElementById('line-'+i).className = 'step-line ' + (i < n ? 'done' : '');
+  });
+}
+
+function updatePeriodLabels() {
+  const v = document.getElementById('f-periode').value;
+  document.querySelectorAll('.plbl').forEach(el => el.textContent = v === 'mois' ? 'mois' : 'an');
+}
+
+/* ═══════════════ LOGO FETCH ════════════════ */
+function fetchLogo() {
+  clearTimeout(logoFetchTimer);
+  const nom = document.getElementById('f-nom').value.trim();
+  if(nom.length < 3) return;
+  logoFetchTimer = setTimeout(async () => {
+    document.getElementById('logo-status').textContent = 'Recherche du logo...';
+    try {
+      const r = await fetch(`https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(nom)}`);
+      const data = await r.json();
+      if(data && data.length > 0) {
+        const company = data[0];
+        if(company.logo) {
+          companyLogoSrc = company.logo;
+          const img = document.createElement('img');
+          img.src = company.logo;
+          img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
+          const box = document.getElementById('logo-box');
+          box.innerHTML = '';
+          box.appendChild(img);
+          document.getElementById('logo-status').textContent = `Logo trouvé: ${company.name}`;
+        }
+      } else {
+        document.getElementById('logo-status').textContent = 'Logo non trouvé — le rapport utilisera le nom de la société';
+      }
+    } catch(e) {
+      document.getElementById('logo-status').textContent = 'Logo non disponible';
+    }
+  }, 800);
+}
+
+/* ═══════════════ ZONES ════════════════ */
+function addZone() {
+  const inp = document.getElementById('zone-input');
+  const v = inp.value.trim();
+  if(!v || zones.includes(v)) { inp.value=''; return; }
+  zones.push(v);
+  renderZones();
+  inp.value = '';
+}
+function removeZone(i) { zones.splice(i,1); renderZones(); }
+function renderZones() {
+  document.getElementById('zones-list').innerHTML = zones.map((z,i) =>
+    `<span class="zone-tag">${z}<button onclick="removeZone(${i})">×</button></span>`).join('');
+}
+
+/* ═══════════════ AGENCES ════════════════ */
+function addAgence() {
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;';
+  div.innerHTML = `<input type="text" class="agence-input" placeholder="Adresse de l'agence" style="flex:1;background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 13px;font-family:var(--font);font-size:.87rem;outline:none;">
+    <button onclick="this.parentElement.remove()" style="padding:9px 12px;background:#fff0ee;color:var(--red);border:1px solid #fecaca;border-radius:8px;cursor:pointer;font-size:.85rem;">✕</button>`;
+  document.getElementById('agences-list').appendChild(div);
+}
+
+function loadAgencesFile(e) {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const text = ev.target.result;
+    let addrs = [];
+    if(file.name.endsWith('.csv')) {
+      const result = Papa.parse(text, {header:true, skipEmptyLines:true});
+      const keys = Object.keys(result.data[0]||{});
+      const addrKey = keys.find(k => /adr|addr|adresse|address/i.test(k)) || keys[0];
+      addrs = result.data.map(r => r[addrKey]).filter(Boolean);
+    } else {
+      addrs = text.split('\n').map(l=>l.trim()).filter(Boolean);
+    }
+    const container = document.getElementById('agences-chips');
+    container.innerHTML = addrs.slice(0,20).map((a,i) =>
+      `<span class="zone-tag" data-addr="${a}">${a}<button onclick="removeImportedAgence(this)">×</button></span>`).join('');
+    document.getElementById('agences-imported').style.display = addrs.length ? '' : 'none';
+    document.getElementById('logo-status');
+    // Also store in agences array
+    agences.length = 0;
+    addrs.forEach(a => agences.push(a));
+  };
+  reader.readAsText(file);
+}
+
+function removeImportedAgence(btn) {
+  const tag = btn.parentElement;
+  const addr = tag.dataset.addr;
+  const idx = agences.indexOf(addr);
+  if(idx >= 0) agences.splice(idx,1);
+  tag.remove();
+}
+
+function getAgences() {
+  const imported = [...document.querySelectorAll('#agences-chips .zone-tag')].map(el => el.dataset.addr).filter(Boolean);
+  const manual   = [...document.querySelectorAll('.agence-input')].map(i => i.value.trim()).filter(Boolean);
+  return [...new Set([...imported, ...manual])];
+}
+
+/* ═══════════════ DATA LOADING ════════════════ */
+async function loadData() {
+  const setLabel = t => document.getElementById('load-label').textContent = t;
+
+  if(!GEO_DATA) {
+    setLabel('Chargement des stations...');
+    try {
+      const r = await fetch('stations_lite.geojson');
+      GEO_DATA = await r.json();
+    } catch(e) { GEO_DATA = {features:[]}; }
+  }
+
+  if(!PRICE_DATA.length) {
+    setLabel('Chargement des prix CSV...');
+    const today = new Date();
+    for(let i=0; i<10; i++) {
+      const d = new Date(today); d.setDate(d.getDate()-i);
+      const ds = d.toISOString().slice(0,10);
+      try {
+        const r = await fetch(`csv/stations_avec_prix_${ds}.csv`);
+        if(!r.ok) continue;
+        const txt = await r.text();
+        PRICE_DATA = Papa.parse(txt, {header:true, skipEmptyLines:true, dynamicTyping:true}).data;
+        CSV_DATE = ds;
+        // Enrich GeoJSON with fresh prices
+        const priceMap = {};
+        for(const row of PRICE_DATA) {
+          const id = String(row.provider_id||'').split('.')[0];
+          if(id) priceMap[id] = row;
+        }
+        for(const f of (GEO_DATA.features||[])) {
+          const id = String(f.properties.id||'');
+          if(priceMap[id]) {
+            const r = priceMap[id];
+            if(r.gazole_prix) f.properties.gazole_prix = r.gazole_prix;
+            if(r.sp95_prix)   f.properties.sp95_prix   = r.sp95_prix;
+            if(r.e10_prix)    f.properties.e10_prix     = r.e10_prix;
+            if(r.sp98_prix)   f.properties.sp98_prix    = r.sp98_prix;
+            if(r.e85_prix)    f.properties.e85_prix     = r.e85_prix;
+            if(r.gplc_prix)   f.properties.gplc_prix    = r.gplc_prix;
+          }
+        }
+        break;
+      } catch(e) { continue; }
+    }
+  }
+}
+
+/* ═══════════════ NORMALIZE COORDS ════════════════ */
+function getLatLng(f) {
+  let [lng, lat] = f.geometry.coordinates;
+  if(Math.abs(lat) > 90)  lat /= 100000;
+  if(Math.abs(lng) > 180) lng /= 100000;
+  return [lat, lng];
+}
+
+/* ═══════════════ ZONE MATCH ════════════════ */
+function inZone(p, zoneList) {
+  if(!zoneList || !zoneList.length) return true;
+  for(const z of zoneList) {
+    const zl = z.toLowerCase().trim();
+    const dept = String(p.departement||'').toLowerCase();
+    const reg  = String(p.region||'').toLowerCase();
+    const cp   = String(p.cp||'').toLowerCase();
+    if(dept===zl || reg===zl || cp.startsWith(zl.replace(/^0/,''))) return true;
+    if(dept.includes(zl) || reg.includes(zl)) return true;
+  }
+  return false;
+}
+
+/* ═══════════════ HAVERSINE ════════════════ */
+function haversine(lat1,lng1,lat2,lng2) {
+  const R=6371, r=x=>x*Math.PI/180;
+  const dLat=r(lat2-lat1), dLng=r(lng2-lng1);
+  const a=Math.sin(dLat/2)**2+Math.cos(r(lat1))*Math.cos(r(lat2))*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+/* ═══════════════ GEOCODE ════════════════ */
+async function geocode(addr) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr+' France')}&format=json&limit=1`,{headers:{'Accept-Language':'fr'}});
+    const d = await r.json();
+    if(d.length) return {lat:+d[0].lat, lng:+d[0].lon};
+  } catch(e) {}
+  return null;
+}
+
+/* ═══════════════ GENERATE ════════════════ */
+async function generateBC() {
+  PROSPECT = {
+    nom:         document.getElementById('f-nom').value.trim() || 'Prospect',
+    prestataire: document.getElementById('f-prestataire').value,
+    activite:    document.getElementById('f-activite').value.trim(),
+    zones:       [...zones],
+    agences:     getAgences(),
+    routeStart:  document.getElementById('f-route-start').value.trim(),
+    routeEnd:    document.getElementById('f-route-end').value.trim(),
+    vehicules:   [...document.querySelectorAll('.veh-input')].reduce((o,i)=>{ if(+i.value>0) o[i.dataset.type]=+i.value; return o; },{}),
+    periode:     document.getElementById('f-periode').value,
+    litrage:     {
+      gazole: +document.getElementById('l-gazole').value||0,
+      sp95:   +document.getElementById('l-sp95').value||0,
+      e10:    +document.getElementById('l-e10').value||0,
+      sp98:   +document.getElementById('l-sp98').value||0,
+      e85:    +document.getElementById('l-e85').value||0,
+      gplc:   +document.getElementById('l-gplc').value||0,
+    }
+  };
+
+  document.getElementById('wizard-form').style.display='none';
+  document.getElementById('loading').style.display='block';
+
+  await loadData();
+
+  document.getElementById('load-label').textContent = 'Analyse en cours...';
+
+  // Geocode agences
+  let agenceCoords = [];
+  for(const addr of PROSPECT.agences) {
+    const c = await geocode(addr);
+    agenceCoords.push({addr, coords:c});
+  }
+
+  // Geocode route
+  let routeCoords = null;
+  if(PROSPECT.routeStart && PROSPECT.routeEnd) {
+    const s = await geocode(PROSPECT.routeStart);
+    const e = await geocode(PROSPECT.routeEnd);
+    if(s && e) routeCoords = {start:s, end:e};
+  }
+
+  buildReport(agenceCoords, routeCoords);
+
+  document.getElementById('loading').style.display='none';
+  document.getElementById('report').style.display='block';
+  document.getElementById('btn-pdf').style.display='';
+  document.getElementById('btn-reset').style.display='';
+}
+
+/* ═══════════════ BUILD REPORT ════════════════ */
+function buildReport(agenceCoords, routeCoords) {
+  const features = GEO_DATA.features || [];
+  const zoneList = PROSPECT.zones;
+  const zoneLabel = zoneList.length ? zoneList.join(', ') : 'France entière';
+
+  // Filter to zone
+  const inZoneFeatures = zoneList.length
+    ? features.filter(f => inZone(f.properties, zoneList))
+    : features;
+
+  // Normalize brands and aggregate
+  const byBrand = {};
+  for(const f of inZoneFeatures) {
+    const brand = normBrand(f.properties.brand);
+    if(!byBrand[brand]) byBrand[brand] = {count:0, prices:[], dkv: f.properties.dkv===1||f.properties.dkv==='1'};
+    byBrand[brand].count++;
+    const g = parseFloat(f.properties.gazole_prix);
+    if(!isNaN(g) && g > 0.5) byBrand[brand].prices.push(g);
+  }
+
+  const summary = Object.entries(byBrand).map(([brand,d]) => ({
+    brand, count:d.count, dkv:d.dkv,
+    avgPrice: d.prices.length ? d.prices.reduce((a,b)=>a+b)/d.prices.length : null
+  })).sort((a,b) => {
+    if(!a.avgPrice) return 1; if(!b.avgPrice) return -1;
+    return a.avgPrice - b.avgPrice;
+  });
+
+  const dkvCount = inZoneFeatures.filter(f=>f.properties.dkv===1||f.properties.dkv==='1').length;
+  const allPrices = inZoneFeatures.map(f=>+f.properties.gazole_prix).filter(v=>!isNaN(v)&&v>.5);
+  const avgAll = allPrices.length ? allPrices.reduce((a,b)=>a+b)/allPrices.length : 0;
+
+  // Header
+  document.getElementById('r-nom').textContent = PROSPECT.nom;
+  document.getElementById('r-meta').textContent =
+    `${zoneLabel} · Prestataire: ${PROSPECT.prestataire||'N/A'} · Prix du ${CSV_DATE||new Date().toLocaleDateString('fr-FR')}`;
+  document.getElementById('sub-zone').textContent =
+    `Zone: ${zoneLabel} — ${inZoneFeatures.length.toLocaleString('fr-FR')} stations Qivia`;
+  document.getElementById('sub-map').textContent =
+    `${inZoneFeatures.length.toLocaleString('fr-FR')} stations dans la zone · ${dkvCount.toLocaleString('fr-FR')} acceptent DKV`;
+  document.getElementById('csv-date-lbl').textContent = CSV_DATE || '—';
+
+  // Client logo in report
+  if(companyLogoSrc) {
+    document.getElementById('r-client-logo').innerHTML =
+      `<img src="${companyLogoSrc}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+  }
+
+  // KPIs
+  document.getElementById('kpi-stations').textContent = inZoneFeatures.length.toLocaleString('fr-FR');
+  document.getElementById('kpi-dkv').textContent = dkvCount.toLocaleString('fr-FR');
+  document.getElementById('kpi-prix').textContent = avgAll > 0 ? avgAll.toFixed(3)+'€' : '—';
+
+  const eco = calcEco(summary);
+  document.getElementById('kpi-economies').textContent = eco > 0 ? fmtEuro(eco) : '—';
+
+  // Chart
+  buildChart(summary);
+
+  // Map
+  buildMap(inZoneFeatures, agenceCoords);
+
+  // Recap table
+  buildRecap(summary, inZoneFeatures.length);
+
+  // BC argument
+  buildArgument(PROSPECT.prestataire, summary, dkvCount, inZoneFeatures.length, avgAll);
+
+  // Economies
+  if(Object.values(PROSPECT.litrage).some(v=>v>0)) {
+    document.getElementById('section-eco').style.display='';
+    buildEco(summary);
+  }
+
+  // Maillage
+  buildMaillage(summary, inZoneFeatures.length, features.length);
+}
+
+/* ═══════════════ CHART ════════════════ */
+function buildChart(summary) {
+  const top12 = summary.filter(b=>b.avgPrice).slice(0,12);
+  if(CHART_OBJ) { CHART_OBJ.destroy(); CHART_OBJ=null; }
+  const ctx = document.getElementById('chart-prix').getContext('2d');
+  CHART_OBJ = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: top12.map(b=>b.brand),
+      datasets:[{
+        label:'Prix moyen Gazole (€/L)',
+        data: top12.map(b=>b.avgPrice.toFixed(3)),
+        backgroundColor: top12.map((_,i)=>i===0?'rgba(0,196,140,.9)':i<3?'rgba(0,196,140,.55)':'rgba(59,130,246,.4)'),
+        borderRadius:6, borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.parsed.y} €/L`}} },
+      scales:{
+        x:{ grid:{color:'rgba(0,0,0,.05)'}, ticks:{color:'#6e7a8a',font:{size:11}} },
+        y:{ grid:{color:'rgba(0,0,0,.05)'}, ticks:{color:'#6e7a8a',font:{size:11},callback:v=>v+'€'}, beginAtZero:false }
+      }
+    }
+  });
+}
+
+/* ═══════════════ MAP ════════════════ */
+function buildMap(inZoneFeatures, agenceCoords) {
+  setTimeout(() => {
+    if(REPORT_MAP) { REPORT_MAP.remove(); REPORT_MAP=null; }
+    REPORT_MAP = L.map('report-map', {zoomControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'© OpenStreetMap', maxZoom:18
+    }).addTo(REPORT_MAP);
+
+    const markers = [];
+    const sample = inZoneFeatures.slice(0, 1000); // limit for perf
+    for(const f of sample) {
+      const [lat, lng] = getLatLng(f);
+      if(!lat||!lng||isNaN(lat)||isNaN(lng)) continue;
+      const isDKV = f.properties.dkv===1||f.properties.dkv==='1';
+      const m = L.circleMarker([lat,lng], {
+        radius:5, color:isDKV?'#3B82F6':'#00C48C',
+        fillColor:isDKV?'#3B82F6':'#00C48C', fillOpacity:.7, weight:1
+      }).addTo(REPORT_MAP);
+      markers.push(m);
+    }
+
+    // Agences
+    for(const {addr,coords} of agenceCoords) {
+      if(!coords) continue;
+      L.marker([coords.lat,coords.lng], {
+        icon: L.divIcon({html:'<div style="background:#F04E37;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>',className:''})
+      }).bindPopup(addr).addTo(REPORT_MAP);
+    }
+
+    if(markers.length) {
+      const group = L.featureGroup(markers);
+      REPORT_MAP.fitBounds(group.getBounds().pad(.1));
+    } else {
+      REPORT_MAP.setView([46.5,2.3],6);
+    }
+  }, 300);
+}
+
+/* ═══════════════ RECAP TABLE ════════════════ */
+function buildRecap(summary, total) {
+  const priceData = summary.filter(b=>b.avgPrice);
+  const avg = priceData.length ? priceData.reduce((a,b)=>a+b.avgPrice,0)/priceData.length : 0;
+  const tbody = document.getElementById('tbody-recap');
+  tbody.innerHTML = '';
+  summary.slice(0,15).forEach(b => {
+    const ecart = b.avgPrice ? b.avgPrice - avg : null;
+    const pct = total > 0 ? (b.count/total*100).toFixed(1) : 0;
+    tbody.innerHTML += `<tr>
+      <td><strong>${b.brand}</strong>${b.dkv?'<span class="badge badge-blue" style="margin-left:6px">DKV</span>':''}</td>
+      <td class="td-num">${b.count.toLocaleString('fr-FR')}</td>
+      <td class="td-num">${b.avgPrice?b.avgPrice.toFixed(3)+'€':'—'}</td>
+      <td>${ecart!==null?`<span class="badge ${ecart<=0?'badge-green':'badge-red'}">${ecart>0?'+':''}${ecart.toFixed(3)}€</span>`:'—'}</td>
+      <td><div class="prog-bar">
+        <div class="prog-track"><div class="prog-fill" style="width:${Math.min(+pct,100)}%"></div></div>
+        <span style="font-size:.72rem;color:var(--muted)">${pct}%</span>
+      </div></td>
+    </tr>`;
+  });
+}
+
+/* ═══════════════ ARGUMENT ════════════════ */
+function buildArgument(prest, summary, dkvCount, total, avgAll) {
+  const top5 = summary.filter(b=>b.avgPrice).slice(0,5);
+  const container = document.getElementById('bc-content');
+  const zl = PROSPECT.zones.length ? PROSPECT.zones.join(', ') : 'la zone';
+  document.getElementById('bc-sub').textContent =
+    `Argumentaire adapté — prestataire actuel : ${prest||'Non renseigné'}`;
+
+  const totalSt = summary.find(b=>/total/i.test(b.brand));
+  const dkvSt   = summary.find(b=>/dkv/i.test(b.brand));
+
+  if(prest === 'TotalEnergies') {
+    container.innerHTML = `
+      <div class="bc-box highlight">
+        <h3>💰 Axe 1 : Économies directes sur le prix au litre</h3>
+        <p>TotalEnergies est souvent <strong>5 à 8 centimes au-dessus</strong> de la moyenne du marché. Avec Qivia, votre flotte accède aux 5 réseaux les moins chers de ${zl} — dont <strong>${top5.map(b=>b.brand).join(', ')}</strong> — au prix moyen de <strong>${top5[0]?.avgPrice?.toFixed(3)||'—'}€/L</strong>.</p>
+      </div>
+      <div class="bc-box">
+        <h3>🗺 Axe 2 : Maillage maintenu ou étendu</h3>
+        <p>TotalEnergies compte ${totalSt?.count?.toLocaleString('fr-FR')||'N/A'} stations dans la zone. Qivia en référence <strong>${total.toLocaleString('fr-FR')}</strong> — soit <strong>${Math.round((total/(totalSt?.count||1)-1)*100)||0}x plus</strong> de points d'approvisionnement.</p>
+      </div>
+      <div class="bc-box"><h3>⚡ Axe 3 : Transparence & reporting</h3>
+        <p>Zéro frais cachés, reporting détaillé par véhicule et par trajet, facturation simplifiée.</p>
+      </div>`;
+  } else if(prest === 'DKV') {
+    container.innerHTML = `
+      <div class="bc-box highlight">
+        <h3>🗺 Axe 1 : Maillage supérieur à DKV</h3>
+        <p>DKV accepte dans votre zone <strong>${dkvCount.toLocaleString('fr-FR')} stations</strong>. Qivia en référence <strong>${total.toLocaleString('fr-FR')}</strong> — soit <strong>${(total-dkvCount).toLocaleString('fr-FR')} stations supplémentaires</strong> accessibles immédiatement.</p>
+      </div>
+      <div class="bc-box">
+        <h3>💸 Axe 2 : Frais cachés DKV</h3>
+        <p>DKV facture des abonnements carte, des frais de réseau et des surcharges hors réseau propre. Qivia offre un modèle transparent, sans frais fixes.</p>
+      </div>
+      <div class="bc-box"><h3>💰 Axe 3 : Prix compétitifs</h3>
+        <p>Accès aux réseaux <strong>${top5.map(b=>b.brand).join(', ')}</strong> à ${top5[0]?.avgPrice?.toFixed(3)||'—'}€/L en moyenne — inférieur au prix DKV constaté.</p>
+      </div>`;
+  } else {
+    container.innerHTML = `
+      <div class="bc-box highlight">
+        <h3>🗺 Maillage Qivia</h3>
+        <p><strong>${total.toLocaleString('fr-FR')} stations</strong> dans votre zone, dont <strong>${dkvCount.toLocaleString('fr-FR')} stations DKV</strong>. Prix moyen Gazole : <strong>${avgAll?.toFixed(3)||'—'}€/L</strong>.</p>
+      </div>
+      <div class="bc-box"><h3>💰 Top 5 réseaux les moins chers</h3>
+        <p>${top5.map((b,i)=>`#${i+1} ${b.brand} — ${b.avgPrice?.toFixed(3)}€/L (${b.count} stations)`).join('<br>')}</p>
+      </div>`;
+  }
+}
+
+/* ═══════════════ ECONOMIES ════════════════ */
+function calcEco(summary) {
+  const top5 = summary.filter(b=>b.avgPrice).slice(0,5);
+  const qAvg = top5.length ? top5.reduce((a,b)=>a+b.avgPrice,0)/top5.length : null;
+  const allAvg = summary.filter(b=>b.avgPrice).reduce((a,b)=>a+b.avgPrice,0)/(summary.filter(b=>b.avgPrice).length||1);
+  const curr = allAvg * 1.02;
+  if(!qAvg || !curr) return 0;
+  const ratios = {gazole:1,sp95:1.05,e10:1.03,sp98:1.10,e85:.65,gplc:.55};
+  let total = 0;
+  for(const [k,lit] of Object.entries(PROSPECT.litrage||{})) {
+    if(lit) total += (curr*ratios[k] - qAvg*ratios[k]) * lit;
+  }
+  return Math.max(0, total);
+}
+
+function buildEco(summary) {
+  const top5 = summary.filter(b=>b.avgPrice).slice(0,5);
+  const qAvg = top5.length ? top5.reduce((a,b)=>a+b.avgPrice,0)/top5.length : 0;
+  const allAvg = summary.filter(b=>b.avgPrice).reduce((a,b)=>a+b.avgPrice,0)/(summary.filter(b=>b.avgPrice).length||1);
+  const curr = allAvg * 1.02;
+  const ratios = {gazole:1,sp95:1.05,e10:1.03,sp98:1.10,e85:.65,gplc:.55};
+  const LABELS = {gazole:'🛢 Gazole',sp95:'⛽ SP95',e10:'🌿 E10',sp98:'⛽ SP98',e85:'🌾 E85',gplc:'💨 GPLc'};
+  const tbody = document.getElementById('tbody-eco');
+  tbody.innerHTML = '';
+  let total = 0;
+  for(const [k,lab] of Object.entries(LABELS)) {
+    const lit = PROSPECT.litrage[k];
+    if(!lit) continue;
+    const c = curr * ratios[k];
+    const q = qAvg * ratios[k];
+    const eco = Math.max(0, (c-q)*lit);
+    total += eco;
+    tbody.innerHTML += `<tr>
+      <td><strong>${lab}</strong></td>
+      <td class="td-num">${lit.toLocaleString('fr-FR')} L</td>
+      <td class="td-num">${c.toFixed(3)}€/L</td>
+      <td class="td-num" style="color:var(--green)">${q.toFixed(3)}€/L</td>
+      <td class="td-num"><strong style="color:var(--green)">${eco>0?fmtEuro(eco):'—'}</strong></td>
+    </tr>`;
+  }
+  document.getElementById('total-savings').textContent = total>0?fmtEuro(total):'—';
+  document.getElementById('savings-period').textContent = `par ${PROSPECT.periode==='mois'?'mois':'an'} estimé`;
+}
+
+/* ═══════════════ MAILLAGE ════════════════ */
+function buildMaillage(summary, zoneTotal, franceTotal) {
+  const features = GEO_DATA.features || [];
+  const tbody = document.getElementById('tbody-maillage');
+  tbody.innerHTML = '';
+
+  const networks = [
+    {name:'Qivia (tous réseaux)', zone:zoneTotal, france:franceTotal, color:'badge-green'},
+    {name:'DKV', zone: summary.filter(b=>b.dkv).reduce((a,b)=>a+b.count,0),
+      france: features.filter(f=>f.properties.dkv===1||f.properties.dkv==='1').length, color:'badge-blue'},
+    ...['TotalEnergies','Leclerc','Intermarché','Carrefour','Super U','BP','Shell','Esso'].map(n=>{
+      const zc = summary.find(b=>b.brand===n)?.count||0;
+      const fc = features.filter(f=>normBrand(f.properties.brand)===n).length;
+      return {name:n, zone:zc, france:fc, color:'badge-gray'};
+    }).filter(n=>n.zone>0||n.france>0)
+  ];
+
+  for(const net of networks) {
+    const pct = franceTotal>0 ? Math.round(net.france/franceTotal*100) : 0;
+    const isQivia = net.name.includes('Qivia');
+    tbody.innerHTML += `<tr>
+      <td><span class="badge ${net.color}">${net.name}</span></td>
+      <td class="td-num">${net.zone.toLocaleString('fr-FR')}</td>
+      <td class="td-num">${net.france.toLocaleString('fr-FR')}</td>
+      <td>
+        <div class="prog-bar">
+          <div class="prog-track" style="max-width:140px">
+            <div class="prog-fill" style="width:${isQivia?100:Math.round(net.france/franceTotal*100)}%"></div>
+          </div>
+          <span style="font-size:.78rem;font-weight:700;color:${isQivia?'var(--green)':'var(--muted)'}">
+            ${isQivia?'100%':(net.france>0?Math.round(net.france/franceTotal*100)+'%':'—')}
+          </span>
+        </div>
+      </td>
+    </tr>`;
+  }
+}
+
+/* ═══════════════ PDF ════════════════ */
+async function exportPDF() {
+  const btn = document.getElementById('btn-pdf');
+  btn.textContent = '⏳ Génération PDF...';
+  btn.disabled = true;
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const report = document.getElementById('report');
+    window.scrollTo(0,0);
+    await new Promise(r=>setTimeout(r,500));
+
+    const canvas = await html2canvas(report, {
+      scale: 1.6,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#F8F9FB',
+      logging: false,
+      windowWidth: 900,
+      ignoreElements: el => el.id === 'report-map',
+    });
+
+    const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const margin = 8;
+    const imgW = pageW - margin*2;
+    const pageHpx = (pageH - margin*2) * canvas.width / imgW;
+    let page = 0, remaining = canvas.height;
+
+    while(remaining > 0) {
+      if(page > 0) pdf.addPage();
+      const sliceH = Math.min(pageHpx, remaining);
+      const sc = document.createElement('canvas');
+      sc.width = canvas.width; sc.height = sliceH;
+      sc.getContext('2d').drawImage(canvas, 0, page*pageHpx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+      pdf.addImage(sc.toDataURL('image/jpeg',.92), 'JPEG', margin, margin, imgW, sliceH*imgW/canvas.width);
+      remaining -= sliceH; page++;
+    }
+
+    const name = (PROSPECT.nom||'prospect').replace(/[^a-z0-9]/gi,'-').toLowerCase();
+    pdf.save(`qivia-bc-${name}-${new Date().toISOString().slice(0,10)}.pdf`);
+  } catch(e) {
+    console.error(e);
+    alert('Erreur PDF. Essayez Ctrl+P → Enregistrer en PDF.');
+  }
+  btn.textContent = '⬇ Télécharger PDF';
+  btn.disabled = false;
+}
+
+/* ═══════════════ HELPERS ════════════════ */
+function fmtEuro(n) {
+  if(n>=1000000) return (n/1000000).toFixed(1).replace('.',',')+'M€';
+  if(n>=10000)   return Math.round(n/1000)+'k€';
+  if(n>=1000)    return (n/1000).toFixed(1).replace('.',',')+'k€';
+  return Math.round(n)+'€';
+}
+
+function resetForm() {
+  document.getElementById('report').style.display='none';
+  document.getElementById('wizard-form').style.display='';
+  document.getElementById('btn-pdf').style.display='none';
+  document.getElementById('btn-reset').style.display='none';
+  goStep(1);
+}
+
+// Auth
+if(!sessionStorage.getItem('qivia_auth') && !location.hostname.includes('localhost') && !location.search.includes('bypass')) {
+  location.href = 'index.html';
+}
+</script>
+</body>
+</html>
