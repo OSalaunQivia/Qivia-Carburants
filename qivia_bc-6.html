@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qivia — Business Case</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --navy:#0D1117; --green:#00C48C; --green-lt:#e6faf4;
+  --bg:#F8F9FB; --white:#fff; --border:#E4E8EF;
+  --text:#1a2332; --muted:#6E7A8A;
+  --red:#F04E37; --yellow:#F59E0B; --blue:#3B82F6;
+  --font:'Inter',sans-serif;
+}
+html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var(--text);}
+
+/* ── TOPBAR ── */
+#topbar{background:var(--navy);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.1);position:sticky;top:0;z-index:200;}
+.logo-wrap img{width:34px;height:34px;border-radius:50%;object-fit:cover;}
+.nav-wrap{position:relative;}
+.nav-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font);}
+.nav-btn:hover{background:rgba(255,255,255,.15);}
+.nav-arrow{font-size:.6rem;color:rgba(255,255,255,.5);}
+.nav-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:10px;min-width:210px;z-index:9999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.nav-dropdown.open{display:block;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;color:rgba(255,255,255,.8);font-size:.8rem;font-weight:500;border-radius:8px;margin:4px;text-decoration:none;}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-item.active{background:rgba(0,196,140,.15);color:#00C48C;}
+.nav-item-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+.tb-right{margin-left:auto;display:flex;gap:10px;align-items:center;}
+.tb-btn{padding:5px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:var(--font);border:1px solid rgba(255,255,255,.2);color:#fff;background:rgba(255,255,255,.08);}
+.tb-btn:hover{background:rgba(255,255,255,.15);}
+.tb-btn.primary{background:var(--green);color:var(--navy);border-color:var(--green);}
+.tb-btn.primary:hover{background:#00b37e;}
+.tb-btn:disabled{opacity:.5;cursor:not-allowed;}
+
+/* ── WIZARD ── */
+.page{max-width:820px;margin:0 auto;padding:36px 20px;}
+.step-bar{display:flex;align-items:center;margin-bottom:40px;}
+.step-node{display:flex;flex-direction:column;align-items:center;}
+.step-c{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;transition:all .25s;}
+.step-c.done{background:var(--green);color:#fff;}
+.step-c.active{background:var(--green);color:#fff;box-shadow:0 0 0 4px rgba(0,196,140,.2);}
+.step-c.pending{background:var(--border);color:var(--muted);}
+.step-lbl{font-size:.66rem;font-weight:600;color:var(--muted);margin-top:4px;white-space:nowrap;}
+.step-line{flex:1;height:2px;background:var(--border);transition:background .25s;}
+.step-line.done{background:var(--green);}
+
+/* ── FORM CARDS ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:26px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.card-title{font-size:.95rem;font-weight:700;margin-bottom:3px;}
+.card-sub{font-size:.76rem;color:var(--muted);margin-bottom:20px;}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.field:last-child{margin-bottom:0;}
+.field label{font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.field input,.field select,.field textarea{background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-family:var(--font);font-size:.86rem;outline:none;width:100%;transition:border-color .2s;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green);}
+.hint{font-size:.69rem;color:var(--muted);margin-top:3px;}
+
+/* ── ZONE TAGS ── */
+.zone-row{display:flex;gap:8px;margin-bottom:8px;}
+.zone-row input{flex:1;}
+.z-add{padding:9px 14px;background:var(--green);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:.8rem;cursor:pointer;}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 11px;background:var(--green-lt);border:1px solid rgba(0,196,140,.3);border-radius:20px;font-size:.76rem;color:var(--green);font-weight:600;}
+.tag button{background:none;border:none;color:var(--green);cursor:pointer;font-size:.85rem;opacity:.6;line-height:1;}
+.tag button:hover{opacity:1;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+
+/* ── UPLOAD ── */
+.upload-zone{border:1.5px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;margin-top:6px;}
+.upload-zone:hover{border-color:var(--green);background:var(--green-lt);}
+.upload-zone input{display:none;}
+.uz-lbl{font-size:.77rem;color:var(--muted);font-weight:500;}
+.uz-hint{font-size:.68rem;color:rgba(110,122,138,.6);margin-top:2px;}
+
+/* ── FLEET TABLE ── */
+.fleet-table{width:100%;border-collapse:collapse;}
+.fleet-table th{padding:8px 12px;background:var(--bg);font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left;border-bottom:2px solid var(--border);}
+.fleet-table td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:.84rem;}
+.fleet-table tr:last-child td{border-bottom:none;}
+.fleet-table td:last-child{width:120px;}
+.nb-input{width:100%;background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:6px 10px;font-family:var(--font);font-size:.84rem;outline:none;text-align:center;}
+.nb-input:focus{border-color:var(--green);}
+
+/* ── LITRAGE TABLE ── */
+.lit-table{width:100%;border-collapse:collapse;margin-top:8px;}
+.lit-table th{padding:8px 12px;background:var(--bg);font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;text-align:left;border-bottom:2px solid var(--border);}
+.lit-table td{padding:8px 12px;border-bottom:1px solid var(--border);font-size:.84rem;}
+.lit-table tr:last-child td{border-bottom:none;}
+.lit-input{width:120px;background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:7px;padding:6px 10px;font-family:var(--font);font-size:.84rem;outline:none;text-align:right;}
+.lit-input:focus{border-color:var(--green);}
+
+/* ── BTNS ── */
+.btn-row{display:flex;justify-content:space-between;align-items:center;margin-top:26px;}
+.btn-p{padding:11px 26px;background:var(--green);color:#fff;border:none;border-radius:9px;font-family:var(--font);font-size:.86rem;font-weight:700;cursor:pointer;}
+.btn-p:hover{background:#00b37e;}
+.btn-s{padding:11px 22px;background:var(--white);color:var(--text);border:1.5px solid var(--border);border-radius:9px;font-family:var(--font);font-size:.86rem;font-weight:600;cursor:pointer;}
+.btn-s:hover{background:var(--bg);}
+
+/* ── LOADING ── */
+#loading{display:none;text-align:center;padding:80px 0;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── HIDDEN MAPS ── */
+.hidden-maps{position:fixed;left:-9999px;top:0;width:760px;}
+.map-div{width:760px;height:380px;border-radius:0;}
+
+/* ── PDF PAGES (A4) ── */
+#pdf-pages{position:fixed;left:-9999px;top:0;visibility:hidden;}
+.pdf-page{width:794px;min-height:1123px;background:#fff;font-family:'Inter',sans-serif;color:#1a2332;padding:40px 44px;position:relative;overflow:hidden;}
+
+/* Cover page */
+.cov-bg{position:absolute;top:0;left:0;right:0;height:340px;background:#0D1117;}
+.cov-logos{display:flex;align-items:center;gap:16px;margin-bottom:28px;position:relative;z-index:1;}
+.cov-logo-box{width:64px;height:64px;border-radius:14px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.cov-logo-box img{max-width:100%;max-height:100%;object-fit:contain;}
+.cov-sep{font-size:1.4rem;color:rgba(255,255,255,.3);}
+.cov-qivia{width:56px;height:56px;border-radius:50%;overflow:hidden;}
+.cov-qivia img{width:100%;height:100%;object-fit:cover;}
+.cov-title{font-size:2rem;font-weight:900;color:#fff;line-height:1.1;position:relative;z-index:1;}
+.cov-sub{font-size:.85rem;color:rgba(255,255,255,.5);margin-top:6px;position:relative;z-index:1;}
+.cov-body{margin-top:260px;}
+.cov-kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px;}
+.cov-kpi{background:#f8f9fb;border:1.5px solid #E4E8EF;border-radius:12px;padding:18px;text-align:center;}
+.cov-kpi-val{font-size:1.8rem;font-weight:900;color:#00C48C;}
+.cov-kpi-lbl{font-size:.66rem;font-weight:700;color:#6e7a8a;text-transform:uppercase;letter-spacing:.05em;margin-top:5px;}
+.cov-info-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.cov-info-box{background:#f8f9fb;border:1.5px solid #E4E8EF;border-radius:10px;padding:16px;}
+.cov-info-box h4{font-size:.72rem;font-weight:700;color:#6e7a8a;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.cov-info-box p{font-size:.84rem;color:#1a2332;font-weight:500;}
+.cov-footer{position:absolute;bottom:30px;left:44px;right:44px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #E4E8EF;padding-top:14px;}
+.cov-footer-lbl{font-size:.7rem;color:#6e7a8a;}
+
+/* Standard page header */
+.ph{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #00C48C;padding-bottom:10px;margin-bottom:24px;}
+.ph-title{font-size:1.1rem;font-weight:800;color:#1a2332;}
+.ph-meta{font-size:.68rem;color:#6e7a8a;}
+.pf{position:absolute;bottom:20px;left:44px;right:44px;display:flex;justify-content:space-between;font-size:.62rem;color:#6e7a8a;border-top:1px solid #e4e8ef;padding-top:8px;}
+
+/* Sections inside pages */
+.ps-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#00C48C;margin-bottom:12px;display:flex;align-items:center;gap:6px;}
+.ps-title::before{content:'';width:3px;height:14px;background:#00C48C;border-radius:2px;display:block;}
+
+/* Tables in PDF */
+table.pt{width:100%;border-collapse:collapse;font-size:.78rem;}
+table.pt th{padding:8px 10px;background:#f8f9fb;font-weight:700;color:#6e7a8a;text-transform:uppercase;font-size:.65rem;letter-spacing:.05em;border-bottom:2px solid #e4e8ef;text-align:left;}
+table.pt td{padding:8px 10px;border-bottom:1px solid #f0f2f5;font-weight:500;}
+table.pt tr:last-child td{border-bottom:none;}
+table.pt .num{font-weight:700;font-variant-numeric:tabular-nums;}
+.badge{display:inline-block;padding:2px 7px;border-radius:10px;font-size:.65rem;font-weight:700;}
+.bg{background:#e6faf4;color:#00C48C;}
+.br{background:#fff0ee;color:#F04E37;}
+.bb{background:#eff6ff;color:#3B82F6;}
+.by{background:#fffbeb;color:#F59E0B;}
+
+/* BC boxes in PDF */
+.bc-pdf{background:#f8f9fb;border-left:3px solid #00C48C;border-radius:0 8px 8px 0;padding:14px 16px;margin-bottom:12px;}
+.bc-pdf h3{font-size:.82rem;font-weight:700;color:#1a2332;margin-bottom:6px;}
+.bc-pdf p{font-size:.77rem;color:#6e7a8a;line-height:1.6;}
+
+/* Savings box */
+.sav-box{background:#e6faf4;border:2px solid #00C48C;border-radius:12px;padding:20px;text-align:center;margin:16px 0;}
+.sav-big{font-size:2.4rem;font-weight:900;color:#00C48C;}
+.sav-lbl{font-size:.68rem;font-weight:700;color:#6e7a8a;text-transform:uppercase;letter-spacing:.05em;margin-top:4px;}
+
+/* Map caption boxes */
+.map-caption{background:#f8f9fb;border:1px solid #e4e8ef;border-radius:8px;padding:12px 14px;margin-top:10px;font-size:.78rem;color:#6e7a8a;line-height:1.6;}
+.map-caption strong{color:#1a2332;}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="logo-wrap"><img id="qivia-logo-nav" src="" style="width:34px;height:34px;border-radius:50%;object-fit:cover;"></div>
+    <div class="nav-wrap">
+      <button class="nav-btn" onclick="toggleNav()">
+        <span>Business Case</span>
+        <span class="nav-arrow">▼</span>
+      </button>
+      <div class="nav-dropdown" id="nav-dropdown">
+        <a class="nav-item" href="qivia_prospect.html">
+          <div class="nav-item-icon" style="background:rgba(0,196,140,.2)">📊</div>
+          Présentation Prospect
+        </a>
+        <a class="nav-item" href="qivia_carte.html">
+          <div class="nav-item-icon" style="background:rgba(45,107,228,.2)">🗺</div>
+          Carte des stations
+        </a>
+        <a class="nav-item active" href="qivia_bc.html">
+          <div class="nav-item-icon" style="background:rgba(245,158,11,.2)">💼</div>
+          Business Case
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="tb-right">
+    <button class="tb-btn primary" id="btn-pdf" style="display:none" onclick="exportPDF()">⬇ Télécharger le PDF</button>
+    <button class="tb-btn" id="btn-reset" style="display:none" onclick="resetWizard()">← Nouveau</button>
+  </div>
+</div>
+
+<!-- WIZARD -->
+<div class="page" id="wizard-form">
+  <div class="step-bar">
+    <div class="step-node"><div class="step-c active" id="dot1">1</div><div class="step-lbl">Prospect</div></div>
+    <div class="step-line" id="line1"></div>
+    <div class="step-node"><div class="step-c pending" id="dot2">2</div><div class="step-lbl">Flotte</div></div>
+    <div class="step-line" id="line2"></div>
+    <div class="step-node"><div class="step-c pending" id="dot3">✓</div><div class="step-lbl">Générer</div></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div id="step1">
+    <div class="card">
+      <div class="card-title">Informations prospect</div>
+      <div class="card-sub">Données collectées lors de la découverte commerciale</div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Nom de la société</label>
+          <input type="text" id="f-nom" placeholder="Ex: Transport Martin SA">
+        </div>
+        <div class="field">
+          <label>Prestataire actuel</label>
+          <select id="f-prest">
+            <option value="">Sélectionner...</option>
+            <option>TotalEnergies</option><option>DKV</option><option>Leclerc</option>
+            <option>Intermarché</option><option>Carrefour</option><option>Super U</option>
+            <option>BP</option><option>Shell</option><option>Esso</option>
+            <option>Avia</option><option>ENI/Agip</option><option>Netto</option>
+            <option>Casino</option><option>Auchan</option><option>AS24</option>
+            <option>Edenred</option><option>WEX</option><option>UTA</option>
+            <option>Autre</option><option>Aucun</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Activité</label>
+          <input type="text" id="f-activite" placeholder="Ex: Transport routier, BTP...">
+        </div>
+        <div class="field">
+          <label>Interlocuteur</label>
+          <input type="text" id="f-contact" placeholder="Ex: M. Martin — Directeur Logistique">
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:14px">
+        <label>Clé API Geoapify <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--green)">— cartes HD dans le PDF</span></label>
+        <input type="text" id="f-geoapi" placeholder="Votre clé Geoapify (geoapify.com/get-started)" autocomplete="off">
+        <div class="hint">Gratuit · 3 000 requêtes/jour · Les cartes dans le PDF seront en haute définition avec fond OpenStreetMap</div>
+      </div>
+
+      <div class="field">
+        <label>Zones géographiques (département, région, ville)</label>
+        <div class="zone-row">
+          <input type="text" id="zone-inp" placeholder="Ex: 75, Bretagne, Lyon, 44..." onkeydown="if(event.key==='Enter'){addZone();event.preventDefault();}">
+          <button class="z-add" onclick="addZone()">Ajouter</button>
+        </div>
+        <div class="chips" id="zones-list"></div>
+      </div>
+
+      <div class="field">
+        <label>Adresses des agences</label>
+        <div class="upload-zone" onclick="document.getElementById('agf').click()">
+          <input type="file" id="agf" accept=".csv,.txt" onchange="loadAgences(event)">
+          <div class="uz-lbl">Importer un CSV — 1 adresse par ligne</div>
+          <div class="uz-hint">ou saisir manuellement ci-dessous</div>
+        </div>
+        <div class="chips" id="ag-chips" style="margin-top:8px"></div>
+        <div id="ag-list" style="margin-top:8px"></div>
+        <button class="btn-s" style="margin-top:8px;padding:7px 14px;font-size:.78rem" onclick="addAgence()">+ Saisir une adresse</button>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+          <span style="font-size:.74rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Rayon autour des agences</span>
+          <select id="r-ag" style="background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:var(--font);font-size:.83rem;outline:none;">
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+            <option value="20" selected>20 km</option>
+            <option value="30">30 km</option>
+            <option value="50">50 km</option>
+            <option value="100">100 km</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:0">
+        <label>Itinéraire principal (optionnel)</label>
+        <div class="row2">
+          <input type="text" id="f-rs" placeholder="Départ : Ex: Paris">
+          <input type="text" id="f-re" placeholder="Arrivée : Ex: Lyon">
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+          <span style="font-size:.74rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Rayon autour de l'itinéraire</span>
+          <select id="r-rt" style="background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:6px 10px;font-family:var(--font);font-size:.83rem;outline:none;">
+            <option value="10">10 km</option>
+            <option value="20">20 km</option>
+            <option value="30" selected>30 km</option>
+            <option value="50">50 km</option>
+            <option value="75">75 km</option>
+            <option value="150">150 km</option>
+          </select>
+        </div>
+        <div class="hint">Les stations dans ce rayon autour de l'axe départ → arrivée seront incluses</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <div></div>
+      <button class="btn-p" onclick="goStep(2)">Suivant →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div id="step2" style="display:none">
+    <div class="card">
+      <div class="card-title">Composition de la flotte</div>
+      <div class="card-sub">Nombre de véhicules par type</div>
+      <table class="fleet-table">
+        <thead><tr><th>Type de véhicule</th><th style="width:160px">Nombre</th></tr></thead>
+        <tbody>
+          <tr><td>Véhicule léger (VL)</td><td><input class="nb-input veh" data-t="VL" type="number" placeholder="0" min="0"></td></tr>
+          <tr><td>Utilitaire léger</td><td><input class="nb-input veh" data-t="Utilitaire" type="number" placeholder="0" min="0"></td></tr>
+          <tr><td>Poids lourd / PL</td><td><input class="nb-input veh" data-t="PL" type="number" placeholder="0" min="0"></td></tr>
+          <tr><td>Engin de chantier / TP</td><td><input class="nb-input veh" data-t="Engin" type="number" placeholder="0" min="0"></td></tr>
+          <tr><td>Véhicule réfrigéré</td><td><input class="nb-input veh" data-t="Réfrigéré" type="number" placeholder="0" min="0"></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Consommation de carburant</div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <div class="card-sub" style="margin:0">Période de référence :</div>
+        <select id="f-per" onchange="updPer()" style="background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:7px 12px;font-family:var(--font);font-size:.84rem;outline:none;">
+          <option value="mois">Mensuel</option>
+          <option value="annee" selected>Annuel</option>
+        </select>
+      </div>
+      <table class="lit-table">
+        <thead><tr><th>Carburant</th><th>Litrage / <span class="per-lbl">an</span></th></tr></thead>
+        <tbody>
+          <tr><td>Gazole</td><td><input class="lit-input" id="l-gazole" type="number" placeholder="0" min="0"> L</td></tr>
+          <tr><td>SP95</td><td><input class="lit-input" id="l-sp95" type="number" placeholder="0" min="0"> L</td></tr>
+          <tr><td>E10</td><td><input class="lit-input" id="l-e10" type="number" placeholder="0" min="0"> L</td></tr>
+          <tr><td>SP98</td><td><input class="lit-input" id="l-sp98" type="number" placeholder="0" min="0"> L</td></tr>
+          <tr><td>E85</td><td><input class="lit-input" id="l-e85" type="number" placeholder="0" min="0"> L</td></tr>
+          <tr><td>GPLc</td><td><input class="lit-input" id="l-gplc" type="number" placeholder="0" min="0"> L</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-s" onclick="goStep(1)">← Retour</button>
+      <button class="btn-p" onclick="launch()">🚀 Générer le Business Case</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="page">
+    <div class="spinner"></div>
+    <div style="color:var(--muted);font-size:.86rem" id="load-lbl">Chargement...</div>
+  </div>
+</div>
+
+<!-- HIDDEN MAPS FOR PDF SCREENSHOTS -->
+<div class="hidden-maps" id="hidden-maps">
+  <div id="map-zone" class="map-div"></div>
+  <div id="map-dkv" class="map-div" style="margin-top:10px"></div>
+</div>
+
+<!-- PDF PAGES (hidden, captured by html2canvas) -->
+<div id="pdf-pages">
+  <!-- Pages injected dynamically -->
+</div>
+
+<script>
+/* ═══════ STATE ═══════ */
+let GEO=[],CSV=[],CSV_DATE='',P={};
+let chartRef=null, MAP_ZONE=null, MAP_DKV=null;
+const zones=[], agences=[];
+const QIVIA_LOGO=`data:image/jpeg;base64,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`;
+
+/* ═══════ FIXED BRANDS ═══════ */
+const BRANDS=['Leclerc','TotalEnergies','Intermarché','Auchan','Super U','Carrefour','Esso','BP','ENI/Agip','Avia'];
+const BRAND_NORM={
+  'e.leclerc':'Leclerc','leclerc':'Leclerc','e leclerc':'Leclerc',
+  'intermarché':'Intermarché','intermarche':'Intermarché','intermarche contact':'Intermarché',
+  'totalenergies':'TotalEnergies','total':'TotalEnergies','total access':'TotalEnergies',
+  'total contact':'TotalEnergies','total excellium':'TotalEnergies','totalenergies access':'TotalEnergies',
+  'bp':'BP','shell':'Shell','esso':'Esso','esso express':'Esso',
+  'super u':'Super U','u express':'Super U','hyper u':'Super U',
+  'carrefour':'Carrefour','carrefour market':'Carrefour','carrefour contact':'Carrefour','carrefour city':'Carrefour',
+  'casino':'Casino','auchan':'Auchan','netto':'Netto','aldi':'Aldi','lidl':'Lidl',
+  'avia':'Avia','eni':'ENI/Agip','agip':'ENI/Agip','eni/agip':'ENI/Agip',
+  'dyneff':'Dyneff','elan':'Elan','as24':'AS24','dkv':'DKV',
+};
+function normB(b){return b?BRAND_NORM[b.toLowerCase().trim()]||b.trim():'Autre';}
+
+/* ═══════ LOGO ═══════ */
+document.getElementById('qivia-logo-nav').src = QIVIA_LOGO;
+
+/* ═══════ NAV ═══════ */
+function toggleNav(){document.getElementById('nav-dropdown').classList.toggle('open');}
+document.addEventListener('click',e=>{if(!e.target.closest('.nav-wrap'))document.getElementById('nav-dropdown').classList.remove('open');});
+
+/* ═══════ WIZARD ═══════ */
+function goStep(n){
+  [1,2].forEach(i=>{
+    document.getElementById('step'+i).style.display=i===n?'':'none';
+    document.getElementById('dot'+i).className='step-c '+(i<n?'done':i===n?'active':'pending');
+    if(i<2)document.getElementById('line'+i).className='step-line '+(i<n?'done':'');
+  });
+}
+function updPer(){
+  const v=document.getElementById('f-per').value;
+  document.querySelectorAll('.per-lbl').forEach(el=>el.textContent=v==='mois'?'mois':'an');
+}
+
+/* ═══════ ZONES ═══════ */
+function addZone(){
+  const inp=document.getElementById('zone-inp'),v=inp.value.trim();
+  if(!v||zones.includes(v)){inp.value='';return;}
+  zones.push(v);renderZones();inp.value='';
+}
+function removeZone(i){zones.splice(i,1);renderZones();}
+function renderZones(){
+  document.getElementById('zones-list').innerHTML=zones.map((z,i)=>
+    `<span class="tag">${z}<button onclick="removeZone(${i})">×</button></span>`).join('');
+}
+
+/* ═══════ AGENCES ═══════ */
+function addAgence(){
+  const d=document.createElement('div');
+  d.style.cssText='display:flex;gap:8px;margin-bottom:6px;';
+  d.innerHTML=`<input type="text" class="agence-inp" placeholder="Adresse" style="flex:1;background:var(--bg);border:1.5px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-family:var(--font);font-size:.84rem;outline:none;">
+    <button onclick="this.parentElement.remove()" style="padding:8px 10px;background:#fff0ee;color:#F04E37;border:1px solid #fecaca;border-radius:8px;cursor:pointer;">✕</button>`;
+  document.getElementById('ag-list').appendChild(d);
+}
+function loadAgences(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const txt=ev.target.result;
+    let addrs=[];
+    if(file.name.endsWith('.csv')){
+      const res=Papa.parse(txt,{header:true,skipEmptyLines:true});
+      const k=Object.keys(res.data[0]||{});
+      const ak=k.find(x=>/addr|adr/i.test(x))||k[0];
+      addrs=res.data.map(r=>r[ak]).filter(Boolean);
+    }else{addrs=txt.split('\n').map(l=>l.trim()).filter(Boolean);}
+    agences.length=0;addrs.forEach(a=>agences.push(a));
+    document.getElementById('ag-chips').innerHTML=agences.slice(0,15).map((a,i)=>
+      `<span class="tag">${a}<button onclick="agences.splice(${i},1);renderAgences()">×</button></span>`).join('');
+  };
+  r.readAsText(file);
+}
+function getAgences(){
+  const m=[...document.querySelectorAll('.agence-inp')].map(i=>i.value.trim()).filter(Boolean);
+  return [...new Set([...agences,...m])];
+}
+
+/* ═══════ DATA ═══════ */
+async function loadData(){
+  const setL=t=>document.getElementById('load-lbl').textContent=t;
+  if(!GEO.length){
+    setL('Chargement des stations...');
+    try{const r=await fetch('stations_lite.geojson');const d=await r.json();GEO=d.features||[];}catch(e){GEO=[];}
+  }
+  if(!CSV.length){
+    setL('Chargement des prix...');
+    for(let i=0;i<10;i++){
+      const d=new Date();d.setDate(d.getDate()-i);
+      const ds=d.toISOString().slice(0,10);
+      try{
+        const r=await fetch(`csv/stations_avec_prix_${ds}.csv`);
+        if(!r.ok)continue;
+        CSV=Papa.parse(await r.text(),{header:true,skipEmptyLines:true,dynamicTyping:true}).data;
+        CSV_DATE=ds;
+        const pm={};
+        CSV.forEach(row=>{const id=String(row.provider_id||'').split('.')[0];if(id)pm[id]=row;});
+        GEO.forEach(f=>{
+          const id=String(f.properties.id||'');
+          if(pm[id]){const r=pm[id];
+            if(r.gazole_prix)f.properties.gazole_prix=r.gazole_prix;
+            if(r.sp95_prix)f.properties.sp95_prix=r.sp95_prix;
+            if(r.e10_prix)f.properties.e10_prix=r.e10_prix;
+            if(r.sp98_prix)f.properties.sp98_prix=r.sp98_prix;
+          }
+        });
+        break;
+      }catch(e){continue;}
+    }
+  }
+}
+
+/* ═══════ COORDS ═══════ */
+function getLL(f){
+  let[lng,lat]=f.geometry.coordinates;
+  if(Math.abs(lat)>90)lat/=100000;
+  if(Math.abs(lng)>180)lng/=100000;
+  return[lat,lng];
+}
+function hav(a,b,c,d){
+  const R=6371,r=x=>x*Math.PI/180,dLa=r(c-a),dLo=r(d-b);
+  const q=Math.sin(dLa/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(dLo/2)**2;
+  return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
+}
+
+/* ═══════ ZONE MATCH ═══════ */
+function inZone(p,zl){
+  if(!zl||!zl.length)return true;
+  for(const z of zl){
+    const zn=z.toLowerCase().trim();
+    if(String(p.departement||'').toLowerCase().includes(zn))return true;
+    if(String(p.region||'').toLowerCase().includes(zn))return true;
+    if(String(p.cp||'').startsWith(zn.replace(/^0/,'')))return true;
+    if(String(p.ville||'').toLowerCase().includes(zn))return true;
+  }
+  return false;
+}
+
+/* ═══════ GEOCODE ═══════ */
+async function geocode(addr){
+  try{
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addr+' France')}&format=json&limit=1`,{headers:{'Accept-Language':'fr'}});
+    const d=await r.json();if(d.length)return{lat:+d[0].lat,lng:+d[0].lon};
+  }catch(e){}
+  return null;
+}
+
+/* ═══════ LAUNCH ═══════ */
+async function launch(){
+  // Timeout global 45 secondes
+  const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout dépassé (45s). Vérifiez votre connexion.')),45000));
+  return Promise.race([_launch(),timeout]);
+}
+async function _launch(){
+  P={
+    nom:document.getElementById('f-nom').value.trim()||'Prospect',
+    prest:document.getElementById('f-prest').value,
+    activite:document.getElementById('f-activite').value.trim(),
+    contact:document.getElementById('f-contact').value.trim(),
+    zones:[...zones],
+    agences:getAgences(),
+    rs:document.getElementById('f-rs').value.trim(),
+    re:document.getElementById('f-re').value.trim(),
+    rAg:+document.getElementById('r-ag').value||20,
+    rRt:+document.getElementById('r-rt').value||30,
+    geoApiKey:document.getElementById('f-geoapi').value.trim(),
+    vehicules:[...document.querySelectorAll('.veh')].reduce((o,i)=>{if(+i.value>0)o[i.dataset.t]=+i.value;return o;},{}),
+    periode:document.getElementById('f-per').value,
+    litrage:{
+      gazole:+document.getElementById('l-gazole').value||0,
+      sp95:+document.getElementById('l-sp95').value||0,
+      e10:+document.getElementById('l-e10').value||0,
+      sp98:+document.getElementById('l-sp98').value||0,
+      e85:+document.getElementById('l-e85').value||0,
+      gplc:+document.getElementById('l-gplc').value||0,
+    }
+  };
+  document.getElementById('wizard-form').style.display='none';
+  document.getElementById('loading').style.display='block';
+  await loadData();
+  document.getElementById('load-lbl').textContent='Géolocalisation...';
+  let agCoords=[];
+  for(const a of P.agences){const c=await geocode(a);agCoords.push({addr:a,c});}
+  let routeC=null;
+  if(P.rs&&P.re){const s=await geocode(P.rs),e=await geocode(P.re);if(s&&e)routeC={s,e};}
+  document.getElementById('load-lbl').textContent='Analyse des zones...';
+  const analysis=analyzeZone(P.zones,agCoords,routeC);
+  document.getElementById('load-lbl').textContent=P.geoApiKey?'Génération des cartes HD...':'Construction du PDF...';
+  await buildPDF(analysis,agCoords,routeC);
+  document.getElementById('loading').style.display='none';
+  document.getElementById('btn-pdf').style.display='';
+  document.getElementById('btn-reset').style.display='';
+  alert('Business Case prêt ! Cliquez sur "Télécharger le PDF".');
+}
+
+/* ═══════ ZONE ANALYSIS ═══════ */
+function analyzeZone(zl,agCoords,routeC){
+  // Filter features by zone OR proximity to agencies/route
+  let features=GEO;
+  if(zl.length||agCoords.length||routeC){
+    features=GEO.filter(f=>{
+      const p=f.properties;
+      if(zl.length&&inZone(p,zl))return true;
+      const[lat,lng]=getLL(f);
+      if(!lat||!lng)return false;
+      // Proximity to agencies (20km)
+      for(const{c}of agCoords){
+        if(c&&hav(lat,lng,c.lat,c.lng)<(P.rAg||20))return true;
+      }
+      // Proximity to route (sample points along the axis)
+      if(routeC){
+        const rRt=P.rRt||30;
+        const steps=8;
+        for(let s=0;s<=steps;s++){
+          const t=s/steps;
+          const pt={lat:routeC.s.lat+(routeC.e.lat-routeC.s.lat)*t,lng:routeC.s.lng+(routeC.e.lng-routeC.s.lng)*t};
+          if(hav(lat,lng,pt.lat,pt.lng)<rRt)return true;
+        }
+      }
+      return false;
+    });
+    if(features.length<10)features=GEO; // fallback
+  }
+
+  // Aggregate by normalized brand (only BRANDS list)
+  const byBrand={};
+  for(const f of features){
+    const brand=normB(f.properties.brand);
+    if(!BRANDS.includes(brand))continue; // only our 10 brands
+    if(!byBrand[brand])byBrand[brand]={count:0,prices:[],dkv:false};
+    byBrand[brand].count++;
+    const g=parseFloat(f.properties.gazole_prix);
+    if(!isNaN(g)&&g>.5)byBrand[brand].prices.push(g);
+  }
+
+  const summary=BRANDS.map(b=>({
+    brand:b,
+    count:byBrand[b]?.count||0,
+    avgPrice:byBrand[b]?.prices.length?byBrand[b].prices.reduce((a,c)=>a+c)/byBrand[b].prices.length:null,
+    dkv:b==='DKV',
+  })).filter(b=>b.count>0).sort((a,b)=>{
+    if(!a.avgPrice)return 1;if(!b.avgPrice)return -1;return a.avgPrice-b.avgPrice;
+  });
+
+  const dkvCount=features.filter(f=>f.properties.dkv===1||f.properties.dkv==='1').length;
+  const totalEnCount=features.filter(f=>normB(f.properties.brand)==='TotalEnergies').length;
+  const allGaz=features.map(f=>+f.properties.gazole_prix).filter(v=>!isNaN(v)&&v>.5);
+  const avgAll=allGaz.length?allGaz.reduce((a,b)=>a+b)/allGaz.length:0;
+
+  return{features,summary,dkvCount,totalEnCount,avgAll,total:features.length};
+}
+
+/* ═══════ BUILD LEAFLET MAPS (display only, not used in PDF) ═══════ */
+async function buildMaps(features,agCoords,routeC){
+  // Maps are for display only — PDF uses SVG/vector maps via jsPDF
+  // No async tile loading needed
+}
+
+/* ═══════ CHART IMAGE ═══════ */
+function buildChartCanvas(summary){
+  const canvas=document.createElement('canvas');
+  canvas.width=700;canvas.height=280;
+  const ctx=canvas.getContext('2d');
+  const top=summary.filter(b=>b.avgPrice).slice(0,10);
+  new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:top.map(b=>b.brand),
+      datasets:[{
+        data:top.map(b=>+b.avgPrice.toFixed(3)),
+        backgroundColor:top.map((_,i)=>i===0?'rgba(0,196,140,.9)':i<3?'rgba(0,196,140,.55)':'rgba(59,130,246,.35)'),
+        borderRadius:5,borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{
+        x:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#6e7a8a',font:{size:11,family:'Inter'}}},
+        y:{grid:{color:'rgba(0,0,0,.06)'},ticks:{color:'#6e7a8a',font:{size:11,family:'Inter'},callback:v=>v+'€'},beginAtZero:false}
+      }
+    }
+  });
+  return canvas.toDataURL('image/png');
+}
+
+/* ═══════ MAP CANVAS — Geoapify HD ou fallback vecteur ═══════ */
+async function buildMapCanvas(features,agCoords,mode,w,h){
+  const apiKey=P.geoApiKey;
+  if(apiKey){
+    try{return await buildMapGeoapify(features,agCoords,mode,w||700,h||320,apiKey);}
+    catch(e){console.warn('Geoapify échoué, fallback vecteur:',e);}
+  }
+  return buildMapVector(features,agCoords,mode,w||700,h||320);
+}
+
+async function buildMapGeoapify(features,agCoords,mode,w,h,apiKey){
+  const pts=features.map(f=>getLL(f)).filter(([a,b])=>a&&b&&!isNaN(a)&&!isNaN(b)&&a>35&&a<55&&b>-10&&b<15);
+  if(!pts.length)return buildMapVector(features,agCoords,mode,w,h);
+
+  const lats=pts.map(p=>p[0]),lngs=pts.map(p=>p[1]);
+  const minLat=Math.min(...lats)-.3, maxLat=Math.max(...lats)+.3;
+  const minLng=Math.min(...lngs)-.3, maxLng=Math.max(...lngs)+.3;
+  const cLat=(minLat+maxLat)/2, cLng=(minLng+maxLng)/2;
+  const span=Math.max(maxLat-minLat, maxLng-minLng);
+  const zoom=span<1?10:span<3?8:span<6?7:6;
+
+  const mapUrl=`https://maps.geoapify.com/v1/staticmap?style=osm-bright-smooth&width=${w}&height=${h}&center=lonlat:${cLng},${cLat}&zoom=${zoom}&apiKey=${apiKey}`;
+
+  // Charger l'image fond de carte (timeout 8s)
+  const bgImg=await Promise.race([
+    new Promise((res,rej)=>{
+      const img=new Image();
+      img.crossOrigin='anonymous';
+      img.onload=()=>res(img);
+      img.onerror=e=>rej(new Error('Image load failed'));
+      img.src=mapUrl;
+    }),
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('Map timeout 8s')),8000))
+  ]);
+
+  // Dessiner fond + stations sur canvas
+  const canvas=document.createElement('canvas');
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(bgImg,0,0,w,h);
+
+  // Projection Web Mercator EPSG:3857
+  const mercY=lat=>Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));
+  const minMY=mercY(minLat), maxMY=mercY(maxLat);
+  const toX=lng=>(lng-minLng)/(maxLng-minLng)*w;
+  const toY=lat=>(maxMY-mercY(lat))/(maxMY-minMY)*h;
+
+  // Stations (sous-échantillonnage si > 1500)
+  const step=Math.max(1,Math.floor(features.length/1500));
+  for(let i=0;i<features.length;i+=step){
+    const f=features[i];
+    const[lat,lng]=getLL(f);
+    if(!lat||!lng||lat<35||lat>55||lng<-10||lng>15)continue;
+    const x=toX(lng),y=toY(lat);
+    if(x<2||x>w-2||y<2||y>h-2)continue;
+    const isDKV=f.properties.dkv===1||f.properties.dkv==='1';
+    const isTot=normB(f.properties.brand)==='TotalEnergies';
+    ctx.globalAlpha=.8;
+    ctx.fillStyle=mode==='dkv'?(isDKV?'#3B82F6':isTot?'#F59E0B':'#00C48C'):'#00C48C';
+    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Agences
+  for(const{addr,c}of agCoords){
+    if(!c)continue;
+    const x=toX(c.lng),y=toY(c.lat);
+    if(x<0||x>w||y<0||y>h)continue;
+    ctx.fillStyle='#F04E37';ctx.strokeStyle='#fff';ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 11px sans-serif';ctx.textAlign='center';
+    ctx.fillText('A',x,y+4);ctx.textAlign='left';
+  }
+
+  return canvas.toDataURL('image/jpeg',.92);
+}
+
+function buildMapVector(features,agCoords,mode,w,h){
+  const canvas=document.createElement('canvas');
+  canvas.width=w||700;canvas.height=h||320;
+  const ctx=canvas.getContext('2d');
+  // Fond carte claire
+  ctx.fillStyle='#f0f4f8';ctx.fillRect(0,0,canvas.width,canvas.height);
+  // Grille légère
+  ctx.strokeStyle='#dde2e8';ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=80){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=0;y<canvas.height;y+=60){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+  // Calculer bounding box
+  const pts=features.map(f=>getLL(f)).filter(([a,b])=>a&&b&&!isNaN(a)&&!isNaN(b)&&a>35&&a<55&&b>-10&&b<15);
+  if(!pts.length)return canvas.toDataURL('image/png');
+  const lats=pts.map(p=>p[0]),lngs=pts.map(p=>p[1]);
+  const minLat=Math.min(...lats)-.3,maxLat=Math.max(...lats)+.3;
+  const minLng=Math.min(...lngs)-.3,maxLng=Math.max(...lngs)+.3;
+  const scX=lng=>(lng-minLng)/(maxLng-minLng)*canvas.width;
+  const scY=lat=>(maxLat-lat)/(maxLat-minLat)*canvas.height;
+  // Tracer stations
+  const sample=features.slice(0,2000);
+  for(const f of sample){
+    const[lat,lng]=getLL(f);
+    if(!lat||!lng||isNaN(lat)||isNaN(lng))continue;
+    const x=scX(lng),y=scY(lat);
+    if(x<0||x>canvas.width||y<0||y>canvas.height)continue;
+    const isDKV=f.properties.dkv===1||f.properties.dkv==='1';
+    const isTot=normB(f.properties.brand)==='TotalEnergies';
+    if(mode==='dkv'){ctx.fillStyle=isDKV?'#3B82F6':isTot?'#F59E0B':'rgba(0,196,140,.5)';}
+    else{ctx.fillStyle='#00C48C';}
+    ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+  }
+  // Agences (rouge)
+  for(const{addr,c}of agCoords){
+    if(!c)continue;
+    const x=scX(c.lng),y=scY(c.lat);
+    ctx.fillStyle='#F04E37';
+    ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.stroke();
+  }
+  // Légende
+  ctx.fillStyle='rgba(255,255,255,.9)';ctx.roundRect(8,canvas.height-44,mode==='dkv'?190:130,36,4);ctx.fill();
+  ctx.font='bold 10px Inter,sans-serif';
+  if(mode==='dkv'){
+    ctx.fillStyle='#3B82F6';ctx.beginPath();ctx.arc(18,canvas.height-30,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a2332';ctx.fillText('Stations DKV',26,canvas.height-27);
+    ctx.fillStyle='#F59E0B';ctx.beginPath();ctx.arc(18,canvas.height-16,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a2332';ctx.fillText('TotalEnergies',26,canvas.height-13);
+  }else{
+    ctx.fillStyle='#00C48C';ctx.beginPath();ctx.arc(18,canvas.height-26,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a2332';ctx.fillText('Stations Qivia',26,canvas.height-23);
+  }
+  if(agCoords.some(a=>a.c)){
+    ctx.fillStyle='#F04E37';ctx.beginPath();ctx.arc(18,canvas.height-12,4,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#1a2332';ctx.fillText('Agences',26,canvas.height-9);
+  }
+  return canvas.toDataURL('image/jpeg',.9);
+}
+
+/* ═══════ BUILD PDF PAGES ═══════ */
+async function buildPDF(analysis,agCoords,routeC){
+  const{summary,dkvCount,totalEnCount,avgAll,total,features}=analysis;
+  const prest=P.prest;
+  const zoneLabel=P.zones.length?P.zones.join(', '):'France entière';
+  const hasFuel=Object.values(P.litrage).some(v=>v>0);
+
+  // Cartes (Geoapify HD si clé API, sinon vecteur)
+  document.getElementById('load-lbl').textContent='Génération des cartes...';
+  const imgZone=await buildMapCanvas(features,agCoords,'zone',700,420);
+  const imgDKV=await buildMapCanvas(features,agCoords,'dkv',700,320);
+
+  // Chart
+  const imgChart=buildChartCanvas(summary);
+
+  // Computed data
+  const top5=summary.filter(b=>b.avgPrice).slice(0,5);
+  const qAvg=top5.length?top5.reduce((a,b)=>a+b.avgPrice,0)/top5.length:null;
+  const currAvg=avgAll>0?avgAll*1.02:null;
+  const eco=calcEco(qAvg,currAvg);
+  const totalVeh=Object.values(P.vehicules).reduce((a,b)=>a+b,0);
+
+  // Build PDF
+  const{jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=15,CW=W-M*2;
+
+  function addPage(){pdf.addPage();}
+
+  // ── PAGE 1: COVER ──
+  pdf.setFillColor(13,17,23);
+  pdf.rect(0,0,W,100,'F');
+  pdf.addImage(QIVIA_LOGO,'JPEG',M,M,12,12,'qivia','MEDIUM');
+  pdf.setFont('helvetica','bold');
+  pdf.setFontSize(22);pdf.setTextColor(255,255,255);
+  pdf.text('Business Case',M,45);
+  pdf.setFontSize(28);pdf.text(P.nom,M,58);
+  pdf.setFont('helvetica','normal');
+  pdf.setFontSize(10);pdf.setTextColor(160,170,185);
+  pdf.text(`Zone : ${zoneLabel}  ·  Prestataire actuel : ${prest||'—'}  ·  ${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}`,M,70);
+  pdf.text(`Données de prix au ${CSV_DATE||'—'}`,M,78);
+
+  // KPIs
+  pdf.setDrawColor(228,232,239);
+  const kpis=[
+    {val:fmtN(total),lbl:'Stations Qivia'},
+    {val:fmtN(dkvCount),lbl:'Stations DKV'},
+    {val:avgAll>0?avgAll.toFixed(3)+'€':'—',lbl:'Prix moy. Gazole'},
+    {val:eco>0?fmtE(eco):'—',lbl:'Économies estimées'},
+  ];
+  const kw=(CW-9)/4;
+  kpis.forEach((k,i)=>{
+    const x=M+i*(kw+3),y=108;
+    pdf.setFillColor(248,249,251);
+    pdf.roundedRect(x,y,kw,24,3,3,'FD');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(14);pdf.setTextColor(0,196,140);
+    pdf.text(k.val,x+kw/2,y+12,{align:'center'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7);pdf.setTextColor(110,122,138);
+    pdf.text(k.lbl.toUpperCase(),x+kw/2,y+19,{align:'center'});
+  });
+
+  // Prospect info box
+  pdf.setFillColor(248,249,251);
+  pdf.roundedRect(M,140,CW/2-4,45,3,3,'FD');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(110,122,138);
+  pdf.text('INFORMATIONS PROSPECT',M+4,148);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(26,35,50);
+  const infos=[[P.nom||'—','Société'],[P.activite||'—','Activité'],[P.contact||'—','Contact'],[P.prest||'—','Prestataire actuel']];
+  infos.forEach(([v,l],i)=>{
+    pdf.setFont('helvetica','bold');pdf.text(l+' :',M+4,156+i*8);
+    pdf.setFont('helvetica','normal');pdf.text(v,M+4+22,156+i*8);
+  });
+
+  // Fleet info
+  pdf.setFillColor(248,249,251);
+  pdf.roundedRect(M+CW/2,140,CW/2,45,3,3,'FD');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(110,122,138);
+  pdf.text('FLOTTE',M+CW/2+4,148);
+  const vehs=Object.entries(P.vehicules);
+  if(vehs.length){
+    pdf.setFontSize(9);
+    vehs.forEach(([t,n],i)=>{
+      pdf.setFont('helvetica','bold');pdf.setTextColor(26,35,50);pdf.text(t+' :',M+CW/2+4,156+i*8);
+      pdf.setFont('helvetica','normal');pdf.text(n+' véhicules',M+CW/2+26,156+i*8);
+    });
+  }else{
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(110,122,138);
+    pdf.text('Non renseigné',M+CW/2+4,156);
+  }
+
+  // Zone
+  pdf.setFillColor(248,249,251);
+  pdf.roundedRect(M,192,CW,30,3,3,'FD');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(110,122,138);
+  pdf.text('PÉRIMÈTRE GÉOGRAPHIQUE',M+4,200);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(26,35,50);
+  pdf.text(zoneLabel,M+4,208);
+  if(P.agences.length){pdf.setFontSize(8);pdf.setTextColor(110,122,138);pdf.text(`${P.agences.length} agence(s) : ${P.agences.slice(0,3).join(' · ')}${P.agences.length>3?'...':''}`,M+4,216);}
+
+  _addFooter(pdf,W,H,M,'Business Case — Confidentiel',1);
+
+  // ── PAGE 2: PRIX PAR RÉSEAU ──
+  addPage();
+  _addHeader(pdf,M,CW,'Prix par reseau dans la zone',P.nom);
+  // Chart image
+  if(imgChart){pdf.addImage(imgChart,'PNG',M,32,CW,56);}
+  // Table
+  const th=['Réseau','Stations zone','Prix moy. Gazole','Écart / moy.'];
+  const tw=[58,35,35,32];
+  const priceData=summary.filter(b=>b.avgPrice);
+  const avgMoy=priceData.length?priceData.reduce((a,b)=>a+b.avgPrice,0)/priceData.length:0;
+  _drawTable(pdf,summary.slice(0,12),th,tw,M,96,b=>[
+    b.brand, b.fmtN(count),
+    b.avgPrice?b.avgPrice.toFixed(3)+'€/L':'—',
+    b.avgPrice?(b.avgPrice-avgMoy>0?'+':'')+(b.avgPrice-avgMoy).toFixed(3)+'€':'—',
+  ],(row,i,x,y,rh,cols,rw)=>{
+    if(i===0){pdf.setFillColor(230,250,244);pdf.rect(x,y,CW,rh,'F');}
+    if(row.avgPrice&&row.avgPrice<avgMoy){
+      const ecx=x+cols[0]+cols[1]+cols[2]+2,ecy=y+rh/2;
+      pdf.setFillColor(230,250,244);pdf.roundedRect(ecx-1,ecy-3,cols[3]-4,5,2,2,'F');
+      pdf.setTextColor(0,156,111);
+    }else if(row.avgPrice&&row.avgPrice>avgMoy){pdf.setTextColor(240,78,55);}
+  });
+  pdf.setFontSize(7);pdf.setTextColor(110,122,138);
+  pdf.text(`Source CSV : ${CSV_DATE||'—'}  ·  Zone : ${zoneLabel}`,M,H-20);
+  _addFooter(pdf,W,H,M,'Business Case — Confidentiel',2);
+
+  // ── PAGE 3: CARTE QIVIA (tous réseaux) ──
+  addPage();
+  _addHeader(pdf,M,CW,`Carte Qivia — tous réseaux (${fmtN(total)} stations)`,P.nom);
+  if(imgZone){pdf.addImage(imgZone,'JPEG',M,28,CW,95);}
+  // Caption
+  pdf.setFillColor(248,249,251);pdf.roundedRect(M,110,CW,52,3,3,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(26,35,50);
+  pdf.text('Pourquoi Qivia est plus intéressant — Couverture réseau',M+4,119);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(70,80,95);
+  const cap1=`Qivia référence ${fmtN(total)} stations dans votre périmètre (${zoneLabel}), incluant tous les grands réseaux français. Cette couverture multi-enseignes garantit à vos conducteurs de trouver une station compatible à tout moment, sur n'importe quel itinéraire.`;
+  const lines1=pdf.splitTextToSize(cap1,CW-8);
+  pdf.text(lines1,M+4,127);
+  // KPIs quick comparison
+  const compData=[
+    {lbl:'Stations Qivia',val:fmtN(total),pct:'100%',col:[0,196,140]},
+    {lbl:'Stations DKV',val:fmtN(dkvCount),pct:total>0?Math.round(dkvCount/total*100)+'%':'—',col:[59,130,246]},
+    {lbl:'Stations TotalEnergies',val:fmtN(totalEnCount),pct:total>0?Math.round(totalEnCount/total*100)+'%':'—',col:[245,158,11]},
+  ];
+  const cw3=(CW-8)/3;
+  compData.forEach(({lbl,val,pct,col},i)=>{
+    const cx=M+i*(cw3+4),cy=155;
+    pdf.setFillColor(248,249,251);pdf.roundedRect(cx,cy,cw3,20,2,2,'F');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(...col);
+    pdf.text(val,cx+cw3/2,cy+9,{align:'center'});
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(110,122,138);
+    pdf.text(lbl.toUpperCase(),cx+cw3/2,cy+15,{align:'center'});
+  });
+  _addFooter(pdf,W,H,M,'Business Case — Confidentiel',3);
+
+  // ── PAGE 4: CARTE DKV vs QIVIA ──
+  addPage();
+  _addHeader(pdf,M,CW,'Comparaison DKV vs Qivia — zone prospect',P.nom);
+  if(imgDKV){pdf.addImage(imgDKV,'JPEG',M,28,CW,95);}
+  // Légende page 4
+  pdf.setFontSize(7.5);pdf.setFont('helvetica','normal');
+  const legY=127;
+  [[59,130,246,'Stations DKV'],[245,158,11,'Stations TotalEnergies'],[0,196,140,'Autres reseaux Qivia']].forEach(([r,g,b,lbl],i)=>{
+    const lx=M+i*62;
+    pdf.setFillColor(r,g,b);pdf.circle(lx+4,legY,3,'F');
+    pdf.setTextColor(26,35,50);pdf.text(lbl,lx+9,legY+1.5);
+  });
+  // Caption
+  pdf.setFillColor(248,249,251);pdf.roundedRect(M,133,CW,55,3,3,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(26,35,50);
+  pdf.text('Pourquoi Qivia est plus interessant — Economies & km parcourus',M+4,142);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(70,80,95);
+  const dkvSt=summary.find(b=>b.brand==='TotalEnergies');
+  const cheapest=summary.filter(b=>b.avgPrice)[0];
+  const cheapPct=dkvSt?.avgPrice&&cheapest?.avgPrice?((dkvSt.avgPrice-cheapest.avgPrice)/dkvSt.avgPrice*100).toFixed(1)+'%':'~5-8%';
+  const cap2=[
+    `• Maillage : Qivia offre ${fmtN(total)} stations dans la zone contre ${fmtN(dkvCount)} pour DKV fmtN(+${(total-dkvCount)} stations supplémentaires).`,
+    `• Prix : ${cheapest?`Le réseau le moins cher (${cheapest.brand}) est à ${cheapest.avgPrice?.toFixed(3)}€/L, soit ${cheapPct} de moins que TotalEnergies`:'Accès aux réseaux les moins chers de la zone'}.`,
+    `• Kilomètres : Avec ${fmtN(total)} stations, vos conducteurs trouvent toujours une station à moins de 5 km, réduisant les détours et le temps improductif.`,
+    `• Frais cachés : contrairement à DKV, pas de frais d'abonnement ni de surcharge hors réseau propre.`,
+  ];
+  cap2.forEach((l,i)=>{
+    const ls=pdf.splitTextToSize(l.replace(/é/g,'e').replace(/è/g,'e').replace(/ê/g,'e').replace(/à/g,'a').replace(/ô/g,'o'),CW-8);
+    pdf.text(ls,M+4,151+i*11);
+  });
+  _addFooter(pdf,W,H,M,'Business Case — Confidentiel',4);
+
+  // ── PAGE 5: BUSINESS CASE ──
+  addPage();
+  _addHeader(pdf,M,CW,'Business Case — Argumentaire commercial',P.nom);
+  buildBCPage(pdf,M,CW,prest,summary,dkvCount,total,avgAll,zoneLabel,top5);
+  _addFooter(pdf,W,H,M,'Business Case — Confidentiel',5);
+
+  // ── PAGE 6: ECONOMIES (if fuel data) ──
+  if(hasFuel&&qAvg&&currAvg){
+    addPage();
+    _addHeader(pdf,M,CW,'Calcul des economies directes',P.nom);
+    buildEcoPage(pdf,M,CW,H,summary,qAvg,currAvg,eco);
+    _addFooter(pdf,W,H,M,'Business Case — Confidentiel',6);
+  }
+
+  // ── PAGE 7: MAILLAGE ──
+  addPage();
+  _addHeader(pdf,M,CW,'Comparaison du maillage reseau',P.nom);
+  buildMaillage(pdf,M,CW,summary,total,features.length);
+  _addFooter(pdf,W,H,M,'Business Case — Confidentiel',hasFuel?7:6);
+
+  // Save
+  const name=(P.nom||'prospect').replace(/[^a-z0-9]/gi,'-').toLowerCase();
+  pdf.save(`qivia-bc-${name}-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+/* ═══════ PDF HELPERS ═══════ */
+function _addHeader(pdf,M,CW,title,nom){
+  // Bande header verte Qivia
+  pdf.setFillColor(0,196,140);pdf.rect(0,0,M+CW+M,22,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(11);pdf.setTextColor(255,255,255);
+  pdf.text(title,M,14);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(255,255,255,0.7);
+  pdf.text(nom,M+CW,14,{align:'right'});
+  // Ligne verte subtile séparatrice
+  pdf.setDrawColor(0,160,110);pdf.setLineWidth(.3);
+  pdf.line(M,22,M+CW,22);
+}
+function _addFooter(pdf,W,H,M,label,page){
+  // Bande footer
+  pdf.setFillColor(13,17,23);pdf.rect(0,H-14,W,14,'F');
+  pdf.setFillColor(0,196,140);pdf.rect(0,H-14,3,14,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(255,255,255);
+  pdf.text('QIVIA',M+2,H-6);
+  pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(160,168,180);
+  pdf.text(label,M+18,H-6);
+  pdf.text(`${page} / 7`,W-M,H-6,{align:'right'});
+  pdf.text('Confidentiel',W/2,H-6,{align:'center'});
+}
+function _drawTable(pdf,rows,headers,colW,sx,sy,valuesFn,rowStyleFn){
+  const rh=8,th=8;
+  pdf.setFillColor(248,249,251);pdf.rect(sx,sy,colW.reduce((a,b)=>a+b),th,'F');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(110,122,138);
+  let cx=sx;
+  headers.forEach((h,i)=>{pdf.text(h.toUpperCase(),cx+2,sy+5);cx+=colW[i];});
+  pdf.setDrawColor(228,232,239);pdf.line(sx,sy+th,sx+colW.reduce((a,b)=>a+b),sy+th);
+  rows.forEach((row,ri)=>{
+    const y=sy+th+ri*rh;
+    if(rowStyleFn)rowStyleFn(row,ri,sx,y,rh,colW,colW.reduce((a,b)=>a+b));
+    pdf.setFont('helvetica',ri===0?'bold':'normal');pdf.setFontSize(7.5);pdf.setTextColor(26,35,50);
+    const vals=valuesFn(row);cx=sx;
+    vals.forEach((v,i)=>{pdf.text(String(v),cx+2,y+5);cx+=colW[i];});
+    pdf.setTextColor(26,35,50);
+    pdf.setDrawColor(240,242,245);pdf.line(sx,y+rh,sx+colW.reduce((a,b)=>a+b),y+rh);
+  });
+}
+
+function buildBCPage(pdf,M,CW,prest,summary,dkvCount,total,avgAll,zoneLabel,top5){
+  let y=28;
+  const addBox=(title,text,isHighlight)=>{
+    const lines=pdf.splitTextToSize(text,CW-12);
+    const bh=24+lines.length*6;
+    if(isHighlight){pdf.setFillColor(230,250,244);pdf.setDrawColor(0,196,140);}
+    else{pdf.setFillColor(248,249,251);pdf.setDrawColor(228,232,239);}
+    pdf.setLineWidth(.4);pdf.roundedRect(M,y,CW,bh,3,3,'FD');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.setTextColor(26,35,50);
+    pdf.text(title,M+4,y+9);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(70,80,95);
+    pdf.text(lines,M+4,y+17);
+    y+=bh+6;
+  };
+  const cheapest=top5[0];
+  if(prest==='TotalEnergies'||prest==='Total'){
+    addBox('Axe 1 — Economies sur le prix au litre (argument principal)',
+      `TotalEnergies est souvent 5 à 8 centimes au-dessus de la moyenne de marché. En orientant votre flotte vers les 5 réseaux les moins chers de la zone — dont ${top5.map(b=>b.brand).join(', ')} — vous bénéficiez d'un prix moyen estimé à ${cheapest?.avgPrice?.toFixed(3)||'—'}€/L contre ${avgAll?.toFixed(3)||'—'}€/L en moyenne de zone.`,true);
+    addBox('Axe 2 — Maillage maintenu ou etendu',
+      `TotalEnergies compte ${summary.find(b=>b.brand==='TotalEnergies')?.count?.toLocaleString('fr-FR')||'N/A'} stations dans la zone. Qivia en référence ${fmtN(total)} — le maillage est maintenu ou étendu, sans rupture opérationnelle.`,false);
+    addBox('Axe 3 — Transparence et reporting',
+      `Zéro frais cachés. Facturation transparente par litre consommé, reporting par véhicule et par trajet. Outil de pilotage en temps réel.`,false);
+  }else if(prest==='DKV'){
+    addBox('Axe 1 — Maillage superieur a DKV (argument principal)',
+      `DKV couvre ${fmtN(dkvCount)} stations dans votre zone. Qivia en référence ${fmtN(total)} — soit +${fmtN(total-dkvCount)} stations accessibles. Vos conducteurs trouvent toujours un point d'approvisionnement, même sur les routes secondaires.`,true);
+    addBox('Axe 2 — Frais caches DKV',
+      `DKV facture des abonnements carte (en général 3-5€/mois/carte), des frais de réseau par transaction, et des surcharges hors réseau propre. Qivia propose un modèle transparent, sans frais fixes mensuels.`,false);
+    addBox('Axe 3 — Acces aux prix competitifs',
+      `En plus du maillage étendu, Qivia donne accès aux réseaux les moins chers : ${top5.map(b=>b.brand).join(', ')}. Prix moyen estimé à ${cheapest?.avgPrice?.toFixed(3)||'—'}€/L.`,false);
+  }else{
+    addBox('Couverture reseau — Qivia',
+      `${fmtN(total)} stations dans votre zone (${zoneLabel}), dont ${fmtN(dkvCount)} acceptant DKV. Prix moyen gazole : ${avgAll?.toFixed(3)||'—'}€/L.`,true);
+    addBox('Top 5 reseaux les moins chers',
+      top5.map((b,i)=>`#${i+1} ${b.brand} — ${b.avgPrice?.toFixed(3)||'—'}€/L (${b.count} stations)`).join('\n'),false);
+  }
+}
+
+function buildEcoPage(pdf,M,CW,H,summary,qAvg,currAvg,eco){
+  const top5=summary.filter(b=>b.avgPrice).slice(0,5);
+  const ratios={gazole:1,sp95:1.05,e10:1.03,sp98:1.10,e85:.65,gplc:.55};
+  const LABS={gazole:'Gazole',sp95:'SP95',e10:'E10',sp98:'SP98',e85:'E85',gplc:'GPLc'};
+  const rows=[];
+  let total=0;
+  for(const[k,lab]of Object.entries(LABS)){
+    const lit=P.litrage[k];if(!lit)continue;
+    const c=currAvg*ratios[k],q=qAvg*ratios[k],e=Math.max(0,(c-q)*lit);
+    total+=e;rows.push({lab,lit,c,q,e});
+  }
+  _drawTable(pdf,rows,['Carburant',`Litrage (${P.periode==='mois'?'mois':'an'})`,`Prix actuel`,`Prix Qivia moy.`,`Économie`],
+    [30,40,32,32,26],M,28,
+    row=>[row.lab,row.fmtN(lit)+' L',row.c.toFixed(3)+'€/L',row.q.toFixed(3)+'€/L',row.e>0?fmtE(row.e):'—'],
+    (row,i,x,y,rh)=>{if(row.e>0){pdf.setTextColor(0,156,111);}}
+  );
+  const savY=28+10+(rows.length+1)*8+16;
+  pdf.setFillColor(230,250,244);pdf.setDrawColor(0,196,140);pdf.setLineWidth(.6);
+  pdf.roundedRect(M,savY,CW,30,4,4,'FD');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(110,122,138);
+  pdf.text('ÉCONOMIE TOTALE ESTIMÉE',M+CW/2,savY+8,{align:'center'});
+  pdf.setFontSize(22);pdf.setTextColor(0,196,140);
+  pdf.text(fmtE(eco),(M+M+CW)/2,savY+21,{align:'center'});
+  pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(110,122,138);
+  pdf.text(`par ${P.periode==='mois'?'mois':'an'} — basé sur les 5 réseaux les moins chers de la zone`,M+CW/2,savY+28,{align:'center'});
+}
+
+function buildMaillage(pdf,M,CW,summary,zoneTotal,franceTotal){
+  const features=GEO;
+  const nets=[
+    {n:'Qivia (tous réseaux)',z:zoneTotal,f:franceTotal,pct:100},
+    {n:'DKV',z:summary.reduce((a,b)=>a+(b.dkv?b.count:0),0),
+      f:features.filter(f=>f.properties.dkv===1||f.properties.dkv==='1').length},
+    ...BRANDS.filter(b=>b!=='DKV').map(b=>({
+      n:b,
+      z:summary.find(s=>s.brand===b)?.count||0,
+      f:features.filter(f=>normB(f.properties.brand)===b).length,
+    }))
+  ].map(n=>({...n,pct:n.pct||+(franceTotal>0?(n.f/franceTotal*100).toFixed(0):0)}))
+   .filter(n=>n.z>0||n.f>0);
+
+  _drawTable(pdf,nets,['Réseau','Stations zone','Stations France','Couverture vs Qivia'],
+    [60,35,35,30],M,28,
+    n=>[n.n,n.fmtN(z),n.fmtN(f),n.n.includes('Qivia')?'100 %':n.pct+'%'],
+    (n,i,x,y,rh)=>{
+      if(n.n.includes('Qivia')){pdf.setFillColor(230,250,244);pdf.rect(x,y,CW,rh,'F');}
+    }
+  );
+  // Note
+  pdf.setFont('helvetica','normal');pdf.setFontSize(7.5);pdf.setTextColor(110,122,138);
+  pdf.text('Note : Qivia est pris comme reference a 100%. Les autres reseaux sont calcules en proportion du total Qivia.',M,200);
+}
+
+function calcEco(qAvg,currAvg){
+  if(!qAvg||!currAvg)return 0;
+  const ratios={gazole:1,sp95:1.05,e10:1.03,sp98:1.10,e85:.65,gplc:.55};
+  let total=0;
+  for(const[k,lit]of Object.entries(P.litrage||{})){
+    if(lit)total+=(currAvg*ratios[k]-qAvg*ratios[k])*lit;
+  }
+  return Math.max(0,total);
+}
+function fmtN(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g," ");}
+function fmtE(n){
+  if(n>=1000000)return(n/1000000).toFixed(1)+'M€';
+  if(n>=10000)return Math.round(n/1000)+'k€';
+  if(n>=1000)return(n/1000).toFixed(1)+'k€';
+  return Math.round(n)+'€';
+}
+
+async function exportPDF(){
+  const btn=document.getElementById('btn-pdf');
+  btn.textContent='⏳ Génération...';btn.disabled=true;
+  try{await _launch();}catch(e){console.error(e);alert('Erreur PDF : '+e.message);}
+  btn.textContent='⬇ Télécharger le PDF';btn.disabled=false;
+}
+
+function resetWizard(){
+  document.getElementById('wizard-form').style.display='';
+  document.getElementById('loading').style.display='none';
+  document.getElementById('btn-pdf').style.display='none';
+  document.getElementById('btn-reset').style.display='none';
+  zones.length=0;agences.length=0;
+  goStep(1);
+}
+
+// Auth
+if(!sessionStorage.getItem('qivia_auth')&&!location.hostname.includes('localhost')&&!location.search.includes('bypass')){
+  location.href='index.html';
+}
+</script>
+</body>
+</html>
