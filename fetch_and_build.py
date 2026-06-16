@@ -678,8 +678,6 @@ def main():
 
     # Générer le GeoJSON enrichi (prix à jour + Excel + DKV géocodées)
     generate_geojson(df)
-    generate_carte(data["stations"])
-    generate_carte(data["stations"], template_path="qivia_mobile_template.html", output_path="qivia_mobile.html")
 
     print(f"\n[OK] Terminé !")
     print(f"     Régions : {data['meta']['regions'][:3]}…")
