@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<script>
+if(sessionStorage.getItem('qivia_auth')!=='1'){window.location.href='index.html';}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Qivia Mobile</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<style>
+
+/* ── BASE ───────────────────────────────────────────── */
+:root{
+  --bg:#F0F2F5;--white:#FFF;--text:#0D1117;--muted:#6E7A8A;
+  --border:#DDE1E7;--green:#00C48C;--gdk:#00956A;--gbg:#E6FBF4;
+  --navy:#0D1117;--red:#F04E37;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;height:-webkit-fill-available;}
+body{height:100%;height:-webkit-fill-available;overflow:hidden;font-family:'Inter',sans-serif;font-size:14px;background:var(--bg);}
+
+/* ── LAYOUT ─────────────────────────────────────────── */
+.app{display:flex;flex-direction:column;height:100%;height:-webkit-fill-available;}
+.topbar{
+  background:var(--navy);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 14px;height:50px;flex-shrink:0;
+}
+.topbar-logo{display:flex;align-items:center;gap:8px;color:#fff;font-weight:800;font-size:.9rem;}
+.topbar-logo img{width:30px;height:30px;border-radius:8px;object-fit:cover;}
+.topbar-actions{display:flex;align-items:center;gap:8px;}
+.filter-btn{
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+  color:#fff;border-radius:8px;padding:6px 12px;
+  font-size:.75rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
+  display:flex;align-items:center;gap:5px;transition:background .15s;
+}
+.filter-btn.active{background:rgba(0,196,140,.25);border-color:var(--green);color:var(--green);}
+.logout-btn{background:none;border:none;color:rgba(255,255,255,.5);font-size:.75rem;cursor:pointer;font-family:'Inter',sans-serif;}
+
+/* ── FILTER PANEL ───────────────────────────────────── */
+.filter-panel{
+  background:var(--navy);
+  border-bottom:1px solid rgba(255,255,255,.1);
+  padding:0 14px;
+  max-height:0;overflow:hidden;
+  transition:max-height .25s ease,padding .25s ease;
+}
+.filter-panel.open{max-height:200px;padding:12px 14px;}
+.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.frow{display:flex;flex-direction:column;gap:3px;}
+.frow label{font-size:.6rem;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.07em;}
+.frow select{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  color:#fff;border-radius:7px;padding:7px 10px;
+  font-family:'Inter',sans-serif;font-size:.78rem;font-weight:500;
+  outline:none;cursor:pointer;
+}
+.frow select option{background:#1e293b;color:#fff;}
+.filter-apply{
+  grid-column:1/-1;margin-top:4px;
+  background:var(--green);border:none;border-radius:8px;
+  color:var(--navy);font-weight:700;font-size:.8rem;
+  padding:9px;cursor:pointer;font-family:'Inter',sans-serif;
+}
+
+/* ── MAIN CONTENT ───────────────────────────────────── */
+.content{flex:1;overflow:hidden;position:relative;}
+.section{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s;
+}
+.section.active{opacity:1;pointer-events:all;}
+
+/* ── CHARTS SECTION ─────────────────────────────────── */
+.charts-scroll{flex:1;overflow-y:auto;padding:12px 12px 4px;display:flex;flex-direction:column;gap:12px;}
+.charts-scroll::-webkit-scrollbar{display:none;}
+.card{background:var(--white);border-radius:14px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+.card-title{display:flex;align-items:center;gap:7px;margin-bottom:12px;}
+.card-num{
+  width:22px;height:22px;border-radius:6px;
+  background:var(--navy);color:#fff;
+  font-size:.62rem;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+}
+.card-title h2{font-size:.82rem;font-weight:700;color:var(--text);}
+.chart-wrap{position:relative;height:220px;}
+
+/* bloc 3 stations */
+.st-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.st-box{border-radius:9px;padding:9px 11px;border:1.5px solid transparent;}
+.st-box.qivia{background:var(--gbg);border-color:var(--green);}
+.st-box.comp{background:#F8F9FB;border-color:var(--border);}
+.st-box.extra{background:#EEF3FD;border-color:#90B8F8;}
+.st-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);}
+.st-val{font-size:1.1rem;font-weight:800;margin-top:2px;line-height:1;}
+.st-box.qivia .st-val{color:var(--gdk);}
+.st-box.extra .st-val{color:#2D6BE4;}
+.st-sub{font-size:.6rem;color:var(--muted);margin-top:2px;}
+.chart-wrap-sm{position:relative;height:180px;margin-top:6px;}
+
+
+
+
+/* ── MAP SECTION ────────────────────────────────────── */
+.map-filter-bar{background:var(--navy);display:flex;gap:6px;padding:8px 12px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;}
+.map-filter-bar::-webkit-scrollbar{display:none;}
+.net-tab{background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.25);color:#fff;border-radius:100px;padding:5px 12px;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap;font-family:'Inter',sans-serif;flex-shrink:0;}
+.net-tab.active{background:rgba(0,196,140,.2);border-color:#00C48C;color:#00C48C;}
+#map{flex:1;}
+/* Popup identique à qivia_carte */
+.leaflet-popup-content-wrapper{border-radius:12px!important;box-shadow:0 4px 20px rgba(0,0,0,.15)!important;}
+.leaflet-popup-content{margin:10px 14px!important;min-width:200px!important;font-family:'Inter',sans-serif!important;}
+.popup-title{font-weight:700;font-size:.85rem;color:#0D1117;margin-bottom:2px;}
+.popup-sub{font-size:.7rem;color:#6E7A8A;margin-bottom:7px;}
+.popup-network{display:flex;gap:4px;margin-bottom:7px;flex-wrap:wrap;}
+.net-badge{padding:2px 7px;border-radius:20px;font-size:.62rem;font-weight:700;}
+.net-badge.qivia{background:#E6FBF4;color:#00956A;}
+.net-badge.dkv{background:#EEF3FD;color:#2D6BE4;}
+.net-badge.total{background:#FEF3F2;color:#EF4444;}
+.popup-prices{display:flex;gap:4px;flex-wrap:wrap;}
+.price-chip{background:#F8F9FB;border-radius:6px;padding:4px 8px;font-size:.7rem;border:1px solid #E4E8EF;}
+.price-chip .fuel{color:#6E7A8A;}
+.price-chip .val{font-weight:700;color:#0D1117;}
+.marker-cluster-small{background-color:rgba(0,196,140,.3)!important;}
+.marker-cluster-small div{background-color:rgba(0,196,140,.7)!important;color:#fff!important;font-weight:700;}
+.marker-cluster-medium{background-color:rgba(45,107,228,.3)!important;}
+.marker-cluster-medium div{background-color:rgba(45,107,228,.7)!important;color:#fff!important;font-weight:700;}
+
+/* ── BOTTOM NAV ─────────────────────────────────────── */
+.bottom-nav{
+  background:var(--white);
+  border-top:1px solid var(--border);
+  display:flex;
+  flex-shrink:0;
+  padding-bottom:max(env(safe-area-inset-bottom,0px),8px);
+  padding-top:4px;
+  min-height:58px;
+}
+.nav-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  gap:3px;padding:10px 0;cursor:pointer;
+  color:var(--muted);font-size:.62rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.04em;
+  border-top:2px solid transparent;transition:color .15s,border-color .15s;
+}
+.nav-item.active{color:var(--navy);border-color:var(--navy);}
+.nav-icon{font-size:1.2rem;line-height:1;}
+
+/* ── HEADER STATS ───────────────────────────────────── */
+.hero-stats{
+  display:flex;gap:10px;padding:10px 12px 0;
+}
+.hero-stat{
+  flex:1;background:var(--white);border-radius:10px;
+  padding:8px 10px;border:1px solid var(--border);
+}
+.hero-val{font-size:.95rem;font-weight:800;color:var(--green);}
+.hero-lbl{font-size:.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+
+
+
+
+
+
+
+
+
+
+
+/* Styles carte (popups, clusters) */
+
+:root{--navy:#0D1117;--green:#00C48C;--white:#fff;--bg:#F8F9FB;--border:#E4E8EF;--muted:#6E7A8A;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;font-family:'Inter',sans-serif;}
+body{display:flex;flex-direction:column;background:var(--navy);}
+
+/* TOPBAR */
+#topbar{background:var(--navy);padding:8px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.1);}
+.logo-wrap{display:flex;align-items:center;gap:8px;font-weight:800;font-size:.95rem;color:#fff;margin-right:8px;}
+.logo-q{width:26px;height:26px;border-radius:6px;background:var(--green);display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:.72rem;font-weight:800;}
+.logo-g{color:var(--green);}
+
+/* NETWORK TABS */
+.net-tabs{display:flex;gap:6px;}
+.net-tab{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;transition:all .15s;white-space:nowrap;font-size:.75rem;font-weight:600;}
+.net-tab:hover{border-color:#9ca3af;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+
+
+.net-tab.active{background:rgba(0,196,140,.2);border-color:#00C48C;color:#00C48C;}
+
+.brand-pills{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.brand-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;border:1.5px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;cursor:pointer;transition:all .15s;white-space:nowrap;font-size:.75rem;font-weight:600;}
+.brand-pill:hover{border-color:#9ca3af;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+.brand-pill.active{border-color:#00C48C;box-shadow:0 0 0 2px #00C48C;}
+.brand-pill img{height:22px;width:auto;max-width:60px;object-fit:contain;flex-shrink:0;}
+.brand-pill:hover{background:rgba(255,255,255,.08);color:#fff;}
+.brand-pill.active{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.4);color:#fff;}
+
+/* FILTERS */
+.filters{display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap;}
+.filter-sep{width:1px;height:20px;background:rgba(255,255,255,.15);}
+select.fsel{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:7px;padding:5px 10px;font-size:.75rem;cursor:pointer;outline:none;}
+select.fsel option{background:#1e293b;color:#fff;}
+.search-wrap{position:relative;}
+#search-input{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:7px;padding:5px 12px 5px 30px;font-size:.75rem;width:200px;outline:none;}
+#search-input::placeholder{color:rgba(255,255,255,.4);}
+.search-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:rgba(255,255,255,.4);font-size:.8rem;}
+#autocomplete{position:absolute;top:calc(100% + 4px);left:0;width:280px;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:8px;z-index:9999;max-height:200px;overflow-y:auto;display:none;}
+.ac-item{padding:8px 12px;font-size:.78rem;color:#fff;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);}
+.ac-item:hover{background:rgba(255,255,255,.08);}
+.ac-item small{color:rgba(255,255,255,.4);display:block;font-size:.7rem;}
+
+/* COUNTERS */
+.counter-wrap{display:flex;gap:12px;}
+.counter{text-align:center;}
+.counter-val{font-size:.88rem;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace;}
+.counter-lbl{font-size:.58rem;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.06em;}
+.csv-btn{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.8);border-radius:8px;padding:5px 12px;font-size:.75rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;transition:background .15s;}
+.csv-btn:hover{background:rgba(255,255,255,.15);}
+.csv-clear{background:rgba(240,78,55,.15);border-color:rgba(240,78,55,.3);color:#FF6B5B;}
+.csv-clear:hover{background:rgba(240,78,55,.25);}
+/* CSV modal */
+.csv-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;}
+.csv-modal{background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:28px;width:480px;max-width:95vw;}
+.csv-modal h3{color:#fff;font-size:1rem;font-weight:700;margin-bottom:6px;}
+.csv-modal p{color:rgba(255,255,255,.5);font-size:.78rem;margin-bottom:16px;line-height:1.5;}
+.csv-modal pre{background:rgba(0,0,0,.3);border-radius:8px;padding:10px 14px;color:#00C48C;font-size:.72rem;margin-bottom:16px;font-family:'JetBrains Mono',monospace;}
+.csv-modal-btns{display:flex;gap:8px;justify-content:flex-end;}
+.csv-modal-btn{padding:8px 18px;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;border:none;font-family:'Inter',sans-serif;}
+.csv-modal-ok{background:var(--green);color:var(--navy);}
+.csv-modal-cancel{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);}
+.csv-error{color:#FF6B5B;font-size:.75rem;margin-top:8px;display:none;}
+
+/* MAP */
+#map{flex:1;min-height:0;}
+
+/* POPUP */
+.leaflet-popup-content{margin:10px 14px;min-width:240px;}
+.popup-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.popup-logo{width:36px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;padding:4px;flex-shrink:0;}
+.popup-logo img{width:100%;height:100%;object-fit:contain;}
+.popup-title{font-weight:700;font-size:13px;color:#0D1117;}
+.popup-sub{font-size:11px;color:#6E7A8A;margin-top:1px;}
+.popup-network{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;}
+.net-badge{font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:10px;}
+.net-badge.qivia{background:#E6FBF4;color:#00956A;}
+.net-badge.dkv{background:#FFF3E0;color:#E65100;}
+.net-badge.total{background:#FEE2E2;color:#B91C1C;}
+.net-badge.brand{background:#F3F4F6;color:#374151;}
+.popup-prices{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.price-chip{background:#F8F9FB;border-radius:6px;padding:4px 8px;font-size:.7rem;border:1px solid #E4E8EF;}
+.price-chip .fuel{color:#6E7A8A;font-weight:400;}
+.price-chip .val{font-weight:700;color:#0D1117;}
+.route-btn{width:100%;padding:8px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;margin-bottom:4px;}
+.route-btn:hover{background:#1e293b;}
+.route-btn:disabled{background:#9CA3AF;cursor:wait;}
+.route-info{background:#EEF3FD;border-radius:8px;padding:10px 12px;margin-top:6px;display:none;}
+.route-info-title{font-weight:700;font-size:.78rem;color:#2D6BE4;margin-bottom:4px;}
+.route-stats{display:flex;gap:16px;}
+.route-stat span:first-child{display:block;font-size:1.1rem;font-weight:800;color:#2D6BE4;}
+.route-stat span:last-child{font-size:.65rem;color:#6E7A8A;}
+.clear-route{width:100%;padding:5px;background:#FEE2E2;color:#B91C1C;border:none;border-radius:6px;font-size:.72rem;cursor:pointer;margin-top:4px;display:none;}
+
+/* Agence popup */
+.agence-popup .popup-title{color:#2D6BE4;}
+.agence-logo{background:#EEF3FD;}
+
+/* Leaflet cluster override */
+.marker-cluster-small{background-color:rgba(0,196,140,.3)!important;}
+.marker-cluster-small div{background-color:rgba(0,196,140,.7)!important;color:#fff!important;font-weight:700;}
+.marker-cluster-medium{background-color:rgba(45,107,228,.3)!important;}
+.marker-cluster-medium div{background-color:rgba(45,107,228,.7)!important;color:#fff!important;font-weight:700;}
+
+.nav-wrap{position:relative;}
+.nav-btn{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:5px 12px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;}
+.nav-btn:hover{background:rgba(255,255,255,.15);}
+.nav-arrow{font-size:.6rem;color:rgba(255,255,255,.5);}
+.nav-dropdown{position:absolute;top:calc(100% + 6px);left:0;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:10px;min-width:200px;z-index:9999;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.nav-dropdown.open{display:block;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;color:rgba(255,255,255,.8);font-size:.8rem;font-weight:500;cursor:pointer;border-radius:8px;margin:4px;text-decoration:none;}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-item.active{background:rgba(0,196,140,.15);color:#00C48C;}
+.nav-item-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;}
+
+/* ── ROUTE CONTROL ── */
+.route-control{position:absolute;bottom:20px;left:60px;right:auto;transform:none;z-index:1000;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:0;width:300px;box-shadow:0 -4px 24px rgba(0,0,0,.5);}
+.route-control.collapsed{width:auto;height:auto;padding:0;border-radius:30px;overflow:hidden;cursor:pointer;}
+.route-toggle{height:38px;padding:0 18px;display:flex;align-items:center;gap:8px;font-size:.8rem;font-weight:600;color:#fff;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+.route-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.route-header span{color:#fff;font-size:.78rem;font-weight:700;flex:1;}
+.route-close{color:rgba(255,255,255,.4);cursor:pointer;font-size:.9rem;padding:2px 4px;}
+.route-close:hover{color:#fff;}
+.route-input-wrap{position:relative;margin-bottom:6px;}
+.route-input{width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;border-radius:8px;padding:7px 30px 7px 10px;font-size:.75rem;outline:none;font-family:'Inter',sans-serif;}
+.route-input::placeholder{color:rgba(255,255,255,.35);}
+.route-input:focus{border-color:#00C48C;}
+.route-swap{width:100%;padding:5px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);border-radius:6px;font-size:.72rem;cursor:pointer;margin-bottom:6px;font-family:'Inter',sans-serif;}
+.route-swap:hover{background:rgba(255,255,255,.1);color:#fff;}
+.route-go{width:100%;padding:8px;background:#00C48C;color:#0D1117;border:none;border-radius:8px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;}
+.route-go:hover{background:#00b37e;}
+.route-go:disabled{background:#374151;color:#6B7280;cursor:wait;}
+.route-result{background:#1e293b;border:1px solid rgba(0,196,140,.4);border-radius:0 0 16px 16px;padding:10px 14px;display:none;}
+.route-result-stats{display:flex;gap:24px;justify-content:center;padding:4px 0;}
+.route-result-stat{display:flex;flex-direction:column;align-items:center;min-width:80px;}
+.route-result-stat span:first-child{display:block;font-size:1.1rem;font-weight:800;color:#00C48C;line-height:1.2;}
+.route-result-stat span:last-child{font-size:.65rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.05em;}
+.route-clear{background:none;border:none;color:rgba(255,100,80,.7);font-size:.68rem;cursor:pointer;margin-top:6px;font-family:'Inter',sans-serif;padding:0;text-align:right;width:100%;display:block;}
+.route-ac{position:absolute;top:calc(100% + 2px);left:0;right:0;background:#1e293b;border:1px solid rgba(255,255,255,.15);border-radius:8px;z-index:9999;max-height:140px;overflow-y:auto;display:none;}
+.route-ac-item{padding:7px 10px;font-size:.73rem;color:rgba(255,255,255,.8);cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);}
+.route-ac-item:hover{background:rgba(255,255,255,.08);}
+
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div style="width:30px;height:30px;border-radius:8px;background:var(--green);display:flex;align-items:center;justify-content:center;font-weight:900;color:var(--navy)">Q</div>
+      <span>Qivia</span>
+    </div>
+    <div class="topbar-actions">
+      <button class="filter-btn" id="filter-toggle-btn" onclick="toggleFilters()">⚙ Filtres</button>
+      <button class="logout-btn" onclick="logout()">Déco.</button>
+    </div>
+  </div>
+
+  <!-- FILTER PANEL -->
+  <div class="filter-panel" id="filter-panel">
+    <div class="filter-grid">
+      <div class="frow"><label>Carburant</label>
+        <select id="gf-fuel" onchange="onFilter()">
+          <option value="gazole_prix">Gazole</option><option value="sp95_prix">SP95</option>
+          <option value="e10_prix">E10</option><option value="sp98_prix">SP98</option>
+          <option value="e85_prix">E85</option><option value="gplc_prix">GPLc</option>
+        </select></div>
+      <div class="frow"><label>Période</label>
+        <select id="gf-period" onchange="onFilter()">
+          <option value="7">7 jours</option><option value="14">14 jours</option>
+          <option value="30">1 mois</option><option value="90">3 mois</option>
+          <option value="all">Tout</option>
+        </select></div>
+      <div class="frow"><label>Zone</label><select id="gf-zone" onchange="onFilter()"><option value="">France entière</option></select></div>
+      <div class="frow"><label>Enseigne</label><select id="gf-brand" onchange="onFilter()"><option value="">Toutes</option></select></div>
+    </div>
+  </div>
+
+  <!-- HERO STATS -->
+  <div class="hero-stats" id="hero-stats">
+    <div class="hero-stat"><div class="hero-val" id="hero-stations">—</div><div class="hero-lbl">Stations Qivia</div></div>
+    <div class="hero-stat"><div class="hero-val" id="hero-saving">—</div><div class="hero-lbl">Éco. GMS vs Pétr.</div></div>
+    <div class="hero-stat"><div class="hero-val">100%</div><div class="hero-lbl">Couverture</div></div>
+  </div>
+
+  <!-- CONTENU -->
+  <div class="content">
+
+    <!-- SECTION GRAPHIQUES -->
+    <div class="section active" id="sec-charts">
+      <div class="charts-scroll">
+        <div class="card">
+          <div class="card-title"><div class="card-num">1</div><h2>Évolution des prix par réseau</h2></div>
+          <div class="chart-wrap"><canvas id="ch-b1"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><div class="card-num">2</div><h2>Prix moyen par enseigne</h2></div>
+          <div class="chart-wrap"><canvas id="ch-b2"></canvas></div>
+        </div>
+        <div class="card" style="padding-bottom:6px">
+          <div class="card-title"><div class="card-num">3</div><h2>Stations Qivia vs réseau actuel</h2></div>
+          <div class="st-row" style="grid-template-columns:1fr 1fr 1fr">
+            <div class="st-box qivia"><div class="st-lbl">Réseau Qivia</div><div class="st-val" id="b3-qivia-count">—</div><div class="st-sub" id="b3-qivia-sub">France entière</div></div>
+            <div class="st-box comp"><div class="st-lbl" id="b3-comp-label">Réseau actuel</div><div class="st-val" id="b3-comp-count">—</div><div class="st-sub" id="b3-comp-sub">Sélectionnez une enseigne</div></div>
+          <div class="st-box extra" id="b3-extra-box" style="visibility:hidden"><div class="st-lbl">Stations suppl.</div><div class="st-val" id="b3-extra-count">—</div><div class="st-sub" id="b3-extra-sub"></div></div>
+          </div>
+          <div class="chart-wrap-sm"><canvas id="ch-b3"></canvas></div>
+        </div>
+        <div style="height:8px"></div>
+      </div>
+    </div>
+
+    <!-- SECTION CARTE — même contenu que qivia_carte, juste les onglets réseau adaptés mobile -->
+    <div class="section" id="sec-map" style="display:none;opacity:0;pointer-events:none;flex-direction:column">
+      <div class="map-filter-bar">
+        <button class="net-tab active" onclick="setNetwork('qivia')" id="tab-qivia">🗺 Qivia</button>
+        <button class="net-tab" onclick="setNetwork('dkv')" id="tab-dkv">DKV</button>
+        <button class="net-tab" onclick="setNetwork('total')" id="tab-total">TotalEnergies</button>
+      </div>
+      <div id="map" style="flex:1"></div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bottom-nav">
+    <div class="nav-item active" id="nav-charts" onclick="switchTab('charts')"><span class="nav-icon">📊</span><span>Graphiques</span></div>
+    <div class="nav-item" id="nav-map" onclick="switchTab('map')"><span class="nav-icon">🗺</span><span>Carte</span></div>
+  </div>
+
+</div>
+
+<script>
+function logout(){sessionStorage.removeItem('qivia_auth');window.location.href='index.html';}
+let currentTab='charts', mapInitialized=false;
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('nav-'+tab).classList.add('active');
+  const sc=document.getElementById('sec-charts'), sm=document.getElementById('sec-map');
+  const hs=document.getElementById('hero-stats');
+  if(tab==='charts'){
+    sc.style.display='';sc.classList.add('active');
+    sm.style.display='none';sm.style.opacity='0';sm.style.pointerEvents='none';sm.classList.remove('active');
+    hs.style.display='flex';
+  } else {
+    sc.classList.remove('active');
+    sm.style.display='flex';sm.style.flexDirection='column';
+    setTimeout(()=>{sm.style.opacity='1';sm.style.pointerEvents='all';sm.classList.add('active');},10);
+    hs.style.display='none';
+    if(!mapInitialized){mapInitialized=true;initMap();} else if(typeof map!=='undefined'&&map)map.invalidateSize();
+  }
+}
+
+function toggleFilters(){
+  const p=document.getElementById('filter-panel'),b=document.getElementById('filter-toggle-btn');
+  const o=p.classList.toggle('open');
+  b.classList.toggle('active',o);b.textContent=o?'✕ Fermer':'⚙ Filtres';
+}
+
+// ── DATA & CHARTS ─────────────────────────────────────────────
+const GMS=['Leclerc','Intermarché','Carrefour','Super U','Auchan','Netto','Casino'];
+const PETRO=['TotalEnergies','Total','Esso','BP','Avia','Eni/Agip','Dyneff','Shell','Elan'];
+const COLORS={
+  'Leclerc':'#A8D5BA','Intermarché':'#B5EAD7','Carrefour':'#AED6F1',
+  'Super U':'#A9DEF9','Auchan':'#CAFFBF','Netto':'#FDFFB6','Casino':'#C7F2A4',
+  'TotalEnergies':'#FFADAD','Esso':'#FFB5A7','BP':'#FFC8DD',
+  'Avia':'#FFCFD2','Eni/Agip':'#E8C1F4','Dyneff':'#D4A5A5',
+  'Shell':'#FFDDD2','Elan':'#F4ACB7','Autre':'#E0E0E0'
+};
+const FL={gazole_prix:'Gazole',sp95_prix:'SP95',e10_prix:'E10',sp98_prix:'SP98',e85_prix:'E85',gplc_prix:'GPLc'};
+
+function gc(b){return COLORS[b]||'#E0E0E0';}
+const CB={
+  responsive:true,maintainAspectRatio:false,
+  plugins:{
+    legend:{labels:{color:'#6E7A8A',font:{family:'Inter',size:10},boxWidth:8,padding:8}},
+    tooltip:{backgroundColor:'#0D1117',titleColor:'#fff',bodyColor:'rgba(255,255,255,.7)',
+      titleFont:{family:'Inter',weight:'700',size:11},bodyFont:{family:'Inter',size:10},
+      padding:8,cornerRadius:8}
+  },
+  scales:{
+    x:{ticks:{color:'#6E7A8A',font:{family:'Inter',size:9},maxRotation:45},grid:{color:'#EAECEF'}},
+    y:{ticks:{color:'#6E7A8A',font:{family:'Inter',size:9}},grid:{color:'#EAECEF'}}
+  }
+};
+
+let DATA=null, charts={};
+let GF={fuel:'gazole_prix',period:'7',brand:'',zone:''};
+
+function onFilter(){
+  GF.fuel=document.getElementById('gf-fuel').value;
+  GF.period=document.getElementById('gf-period').value;
+  GF.brand=document.getElementById('gf-brand').value;
+  GF.zone=document.getElementById('gf-zone').value;
+  buildAll();
+}
+
+function getFilteredDates(){
+  const all=DATA.meta.dates;
+  if(GF.period==='all')return all;
+  return all.slice(-parseInt(GF.period));
+}
+
+function avg(arr){const v=arr.filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b)/v.length:null;}
+function fmtd(d){const p=d.slice(5).split('-');return p[1]+'/'+p[0];}
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+async function boot(){
+  try{
+    const r=await fetch('./qivia_data.json');if(!r.ok)throw new Error('HTTP '+r.status);
+    DATA=await r.json();
+    // Normaliser Total → TotalEnergies
+    DATA.meta.brands=DATA.meta.brands.map(b=>b==='Total'?'TotalEnergies':b);
+    DATA.brand_daily=DATA.brand_daily.map(r=>({...r,brand:r.brand==='Total'?'TotalEnergies':r.brand}));
+    if(DATA.brand_region_daily)DATA.brand_region_daily=DATA.brand_region_daily.map(r=>({...r,brand:r.brand==='Total'?'TotalEnergies':r.brand}));
+    DATA.stations=DATA.stations.map(s=>({...s,brand:s.brand==='Total'?'TotalEnergies':s.brand}));
+
+    document.getElementById('hero-stations').textContent=DATA.meta.n_stations.toLocaleString('fr-FR');
+
+    // Remplir sélects brands
+    let brands=(DATA.meta.brands||[]).filter(b=>b&&b!=='Autre'&&b!=='nan'&&b!=='null');
+    // Si meta.brands vide, déduire depuis brand_daily
+    if(!brands.length&&DATA.brand_daily){
+      const bset=new Set(DATA.brand_daily.map(r=>r.brand).filter(b=>b&&b!=='Autre'&&b!=='nan'));
+      brands=[...bset].sort();
+    }
+    const sb=document.getElementById('gf-brand');
+    // Vider les options existantes sauf "Toutes"
+    while(sb.options.length>1)sb.remove(1);
+    brands.forEach(b=>sb.add(new Option(b,b)));
+
+    // Remplir régions
+    let regions=DATA.meta.regions||[];
+    if(!regions.length&&DATA.brand_region_daily){
+      const rset=new Set(DATA.brand_region_daily.map(r=>r.region).filter(Boolean));
+      regions=[...rset].sort();
+    }
+    const sz=document.getElementById('gf-zone');
+    while(sz.options.length>1)sz.remove(1);
+    regions.forEach(r=>sz.add(new Option(r,r)));
+
+    buildAll();
+  }catch(e){console.error('boot:',e);}
+}
+
+function getBrandDaily(){
+  if(GF.zone&&DATA.brand_region_daily){
+    return DATA.brand_region_daily.filter(r=>r.region===GF.zone);
+  }
+  return DATA.brand_daily;
+}
+
+function buildAll(){
+  calcHeroSaving();buildBloc1();buildBloc2();buildBloc3();
+}
+
+function calcHeroSaving(){
+  const fuel=GF.fuel,dates=getFilteredDates(),bd=getBrandDaily();
+  const gv=bd.filter(r=>GMS.includes(r.brand)&&dates.includes(r.date)&&r[fuel]!=null).map(r=>r[fuel]);
+  const pv=bd.filter(r=>PETRO.includes(r.brand)&&dates.includes(r.date)&&r[fuel]!=null).map(r=>r[fuel]);
+  if(!gv.length||!pv.length){document.getElementById('hero-saving').textContent='—';return;}
+  const diff=(pv.reduce((a,b)=>a+b)/pv.length)-(gv.reduce((a,b)=>a+b)/gv.length);
+  document.getElementById('hero-saving').textContent=diff>0?(diff*100).toFixed(1)+'c/L':'0c/L';
+}
+
+function buildBloc1(){
+  const fuel=GF.fuel,dates=getFilteredDates(),brands=DATA.meta.brands.filter(b=>b!=='Autre'&&b!=='nan');
+  const bd=getBrandDaily(),bdMap={};
+  bd.forEach(r=>{if(!bdMap[r.brand])bdMap[r.brand]={};bdMap[r.brand][r.date]=r[fuel];});
+  // Afficher seulement les dates récentes sur mobile (max 30 labels)
+  const step=Math.max(1,Math.floor(dates.length/20));
+  const datesDisplay=dates.filter((_,i)=>i%step===0||i===dates.length-1);
+  dc('b1');
+  charts['b1']=new Chart(document.getElementById('ch-b1'),{
+    type:'line',
+    data:{
+      labels:datesDisplay.map(d=>fmtd(d)),
+      datasets:brands.map(b=>({
+        label:b,borderColor:gc(b),backgroundColor:'transparent',
+        data:datesDisplay.map(d=>bdMap[b]&&bdMap[b][d]!=null?bdMap[b][d]:null),
+        tension:.35,pointRadius:0,pointHoverRadius:4,borderWidth:1.5,
+        fill:false,spanGaps:true
+      }))
+    },
+    options:{...CB,interaction:{mode:'index',intersect:false}}
+  });
+}
+
+function buildBloc2(){
+  const fuel=GF.fuel,dates=getFilteredDates(),brands=DATA.meta.brands.filter(b=>b!=='Autre'&&b!=='nan');
+  const bd=getBrandDaily();
+  const avgs=brands.map(b=>{
+    const vals=bd.filter(r=>r.brand===b&&dates.includes(r.date)&&r[fuel]!=null).map(r=>r[fuel]);
+    return{b,v:vals.length?vals.reduce((a,c)=>a+c)/vals.length:null};
+  }).filter(x=>x.v!=null).sort((a,b)=>a.v-b.v);
+  const minVal=avgs.length?Math.min(...avgs.map(x=>x.v)):1.5;
+  const maxVal=avgs.length?Math.max(...avgs.map(x=>x.v)):2.5;
+  const yMin=Math.floor(minVal*10)/10;
+  const yMax=Math.ceil(maxVal*10)/10;
+  dc('b2');
+  charts['b2']=new Chart(document.getElementById('ch-b2'),{
+    type:'bar',
+    data:{
+      labels:avgs.map(x=>x.b.length>10?x.b.slice(0,9)+'…':x.b),
+      datasets:[{label:FL[fuel]+' €/L',data:avgs.map(x=>parseFloat(x.v.toFixed(4))),
+        backgroundColor:avgs.map(x=>gc(x.b)),borderRadius:5,borderSkipped:false}]
+    },
+    options:{...CB,plugins:{...CB.plugins,legend:{display:false}},
+      scales:{x:{...CB.scales.x,ticks:{...CB.scales.x.ticks,font:{size:9}}},
+        y:{...CB.scales.y,min:yMin,max:yMax,
+          ticks:{...CB.scales.y.ticks,callback:v=>v.toFixed(3)+' €'}}}}
+  });
+}
+
+function buildBloc3(){
+  const brand=GF.brand;
+  let allSt=DATA.stations||[];
+  let filtSt=GF.zone?allSt.filter(s=>s.region===GF.zone):allSt;
+  const qCount=!GF.zone?DATA.meta.n_stations:filtSt.length;
+  document.getElementById('b3-qivia-count').textContent=qCount.toLocaleString('fr-FR');
+  document.getElementById('b3-qivia-sub').textContent=GF.zone||'France entière';
+  if(brand){
+    const cCount=filtSt.filter(s=>s.brand===brand).length;
+    document.getElementById('b3-comp-label').textContent=brand;
+    document.getElementById('b3-comp-count').textContent=cCount.toLocaleString('fr-FR');
+    document.getElementById('b3-comp-sub').textContent=brand+(GF.zone?' dans '+GF.zone:' en France');
+    const diff=qCount-cCount,pct=cCount>0?Math.round(diff/cCount*100):0;
+    document.getElementById('b3-extra-count').textContent='+'+diff.toLocaleString('fr-FR');
+    document.getElementById('b3-extra-sub').textContent=pct+'× plus de choix';
+    document.getElementById('b3-extra-box').style.visibility='visible';
+  }else{
+    document.getElementById('b3-comp-count').textContent='—';
+    document.getElementById('b3-extra-box').style.visibility='hidden';
+  }
+  const bc={};filtSt.forEach(s=>{if(s.brand&&s.brand!=='Autre'&&s.brand!=='nan')bc[s.brand]=(bc[s.brand]||0)+1;});
+  const sorted=Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  dc('b3');
+  charts['b3']=new Chart(document.getElementById('ch-b3'),{
+    type:'bar',
+    data:{labels:sorted.map(x=>x[0].length>9?x[0].slice(0,8)+'…':x[0]),
+      datasets:[{label:'Stations',data:sorted.map(x=>x[1]),
+        backgroundColor:sorted.map(x=>gc(x[0])),borderRadius:5}]},
+    options:{...CB,plugins:{...CB.plugins,legend:{display:false}}}
+  });
+}
+
+
+// ── MAP ───────────────────────────────────────────────────────
+let mapInitialized = false;
+let leafMap = null, stationCluster = null;
+let currentNetwork = 'qivia';
+// Données transformées au format qivia_carte : {lat, lon, brand, name, address, city, postal, prices:{gazole,...}}
+let STATION_MAP = {}; // key=lat_lon
+let NET_DATA = {qivia:[], dkv:[], total:[]};
+
+const FUEL_NAMES = {gazole:'Gazole',sp95:'SP95',e10:'E10',sp98:'SP98',e85:'E85',gplc:'GPLc'};
+const DKV_BRANDS   = ['TotalEnergies','Avia','BP','Esso','ENI/Agip','Shell','Elan','Dyneff','Cora'];
+const TOTAL_BRANDS = ['TotalEnergies'];
+
+// Transforme une station qivia_data.json → format qivia_carte
+function normalizeStation(s) {
+  return {
+    lat:     s.lat,
+    lon:     s.lng,   // lng → lon comme dans qivia_carte
+    brand:   s.brand||'',
+    name:    s.name||s.address||'',
+    address: s.address||'',
+    city:    s.city||'',
+    postal:  s.postal||'',
+    region:  s.region||'',
+    department: s.department||'',
+    prices: {
+      gazole: s.gazole_prix||null,
+      sp95:   s.sp95_prix||null,
+      e10:    s.e10_prix||null,
+      sp98:   s.sp98_prix||null,
+      e85:    s.e85_prix||null,
+      gplc:   s.gplc_prix||null
+    },
+    dkv:   s.dkv===true,
+    total: s.total===true
+  };
+}
+
+function buildPricesHtml(prices) {
+  if(!prices) return '';
+  return Object.entries(prices)
+    .filter(([k,v])=>v!=null&&v>0)
+    .map(([k,v])=>`<div class="price-chip"><span class="fuel">${FUEL_NAMES[k]||k} </span><span class="val">${parseFloat(v).toFixed(3)} €</span></div>`)
+    .join('');
+}
+
+function buildPopup(s, net) {
+  const nets = [];
+  if(NET_DATA.qivia.some(q=>q.lat===s.lat&&q.lon===s.lon)) nets.push('<span class="net-badge qivia">Qivia</span>');
+  if(NET_DATA.dkv.some(d=>d.lat===s.lat&&d.lon===s.lon)) nets.push('<span class="net-badge dkv">DKV</span>');
+  if(NET_DATA.total.some(t=>t.lat===s.lat&&t.lon===s.lon)) nets.push('<span class="net-badge total">Total</span>');
+  const title = (!s.name||s.name==='nan'||s.name==='None')?(s.brand||'Station'):s.name;
+  return `<div class="popup-title">${title}</div>
+<div class="popup-sub">${s.address||''} — ${s.city||''} (${s.postal||''})</div>
+<div class="popup-network">${nets.join('')}</div>
+<div class="popup-prices">${buildPricesHtml(s.prices)}</div>`;
+}
+
+function getStationIcon(net) {
+  const colors = {qivia:'#00C48C', dkv:'#3B82F6', edenred:'#F59E0B', total:'#EF4444'};
+  const col = colors[net]||'#6B7280';
+  return L.divIcon({
+    html:`<div style="width:9px;height:9px;border-radius:50%;background:${col};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>`,
+    className:'', iconSize:[9,9], iconAnchor:[4,4], popupAnchor:[0,-5]
+  });
+}
+
+function setNetwork(net) {
+  currentNetwork = net;
+  document.querySelectorAll('.net-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+net).classList.add('active');
+  renderMarkers();
+}
+
+function renderMarkers() {
+  if(!leafMap||!stationCluster) return;
+  stationCluster.clearLayers();
+  const data = NET_DATA[currentNetwork]||[];
+  data.forEach(s=>{
+    if(!s.lat||!s.lon) return;
+    const marker = L.marker([s.lat, s.lon], {icon: getStationIcon(currentNetwork)});
+    marker.bindPopup(buildPopup(s, currentNetwork), {maxWidth:280});
+    stationCluster.addLayer(marker);
+  });
+  leafMap.addLayer(stationCluster);
+}
+
+function initMap() {
+  if(mapInitialized) return;
+  mapInitialized = true;
+
+  leafMap = L.map('map', {zoomControl:true}).setView([46.8, 2.5], 6);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap', maxZoom:19
+  }).addTo(leafMap);
+  stationCluster = L.markerClusterGroup({chunkedLoading:true, maxClusterRadius:40});
+
+  const loadAndRender = (stations) => {
+    // Transformer toutes les stations au format qivia_carte
+    const all = stations.map(normalizeStation).filter(s=>s.lat&&s.lon);
+    NET_DATA.qivia = all; // toutes les stations = réseau Qivia
+    NET_DATA.dkv   = all.filter(s=>s.dkv===true);   // flag injecté par fetch_and_build.py
+    NET_DATA.total = all.filter(s=>s.total===true);  // flag injecté par fetch_and_build.py
+    renderMarkers();
+    leafMap.invalidateSize();
+  };
+
+  if(DATA&&DATA.stations) {
+    loadAndRender(DATA.stations);
+  } else {
+    fetch('./qivia_data.json').then(r=>r.json()).then(d=>{
+      if(!DATA) DATA=d;
+      loadAndRender(d.stations||[]);
+    }).catch(e=>console.error('Map data load error:',e));
+  }
+}
+
+// ── BOOT ──────────────────────────────────────────────────────
+boot();
+
+</script>
+
+<script>
+// ════════════════════════════════════════════════════
+// CODE CARTE — IDENTIQUE À qivia_carte_template.html
+// ════════════════════════════════════════════════════
+/* ###QIVIA_DATA_END### */
+
+// logos set in initMap
+
+// getStationLogo removed (duplicate)
+
+// map declared in our code below
+let _markerLayer_orig = null; //L.layerGroup();
+let _overlayLayer_orig = null; //L.layerGroup();
+let _searchCenter_orig = null, _searchRadius_orig = 10;
+let _debounceTimer_orig = null;
+
+
+const AGENCES_LEGACY = [{"nom": "Agence Villepinte", "adresse": "5 rue des Trois Sœurs", "ville": "VILLEPINTE", "region": "Île-de-France", "lat": 48.970324, "lon": 2.50937}, {"nom": "Agence Yutz", "adresse": "4 boulevard Henri Becquerel", "ville": "YUTZ", "region": "Grand Est", "lat": 49.348715, "lon": 6.171024}, {"nom": "Agence Saint-Avold", "adresse": "18 avenue du Général Patton", "ville": "SAINT-AVOLD", "region": "Grand Est", "lat": 49.119495, "lon": 6.710433}, {"nom": "Agence Goin", "adresse": "2/4 rue Pilâtre Rozier", "ville": "GOIN", "region": "Grand Est", "lat": 48.979368, "lon": 6.238225}, {"nom": "Agence Villepinte", "adresse": "22 avenue des Nations", "ville": "VILLEPINTE", "region": "Île-de-France", "lat": 48.97341, "lon": 2.508361}, {"nom": "Agence Wittenheim", "adresse": "11 rue de Lorraine", "ville": "WITTENHEIM", "region": "Grand Est", "lat": 47.820167, "lon": 7.309732}, {"nom": "Agence Montoir-De-Bretagne", "adresse": "27 boulevard de Cadrean", "ville": "MONTOIR-DE-BRETAGNE", "region": "Pays de la Loire", "lat": 47.318472, "lon": -2.156649}, {"nom": "Agence Donges", "adresse": "5 les Magouets", "ville": "DONGES", "region": "Pays de la Loire", "lat": 47.313859, "lon": -2.078528}, {"nom": "Agence Bagnols-Sur-Cèze", "adresse": "Rue de la Floure", "ville": "BAGNOLS-SUR-CÈZE", "region": "Occitanie", "lat": 44.152695, "lon": 4.638472}, {"nom": "Agence Dunkerque", "adresse": "Avenue de la Gironde", "ville": "DUNKERQUE", "region": "Hauts-de-France", "lat": 51.023875, "lon": 2.362462}, {"nom": "Agence Grande-Synthe", "adresse": "3 rue Guiseppe Garibaldi", "ville": "GRANDE-SYNTHE", "region": "Hauts-de-France", "lat": 50.998196, "lon": 2.313224}, {"nom": "Agence Corbas", "adresse": "13 rue du Vercors", "ville": "CORBAS", "region": "Auvergne-Rhône-Alpes", "lat": 45.673069, "lon": 4.914762}, {"nom": "Agence Yutz", "adresse": "4 boulevard Henri Becquerel", "ville": "YUTZ", "region": "Grand Est", "lat": 49.348715, "lon": 6.171024}, {"nom": "Agence Le Lamentin", "adresse": "ZI La Lézarde - BP 412", "ville": "LE LAMENTIN", "region": "Martinique", "lat": 14.607392, "lon": -61.006632}, {"nom": "Agence Kourou", "adresse": "Zone E.L.A.2 - Bât Curie - BP 254", "ville": "KOUROU", "region": "Guyane", "lat": 5.2316, "lon": -52.7742}, {"nom": "Agence Porcelette", "adresse": "Route de Diesen", "ville": "PORCELETTE", "region": "Grand Est", "lat": 49.163494, "lon": 6.659212}, {"nom": "Agence La Hague", "adresse": "363 rue de la Fosse Yvon", "ville": "LA HAGUE", "region": "Normandie", "lat": 49.658519, "lon": -1.81918}, {"nom": "Agence Cherbourg-En-Cotentin", "adresse": "6 rue Lech Walesa", "ville": "CHERBOURG-EN-COTENTIN", "region": "Normandie", "lat": 49.65923, "lon": -1.68315}, {"nom": "Agence Cuincy", "adresse": "Parc d'Activités de la Haute Rive", "ville": "CUINCY", "region": "Hauts-de-France", "lat": 50.371144, "lon": 3.030986}, {"nom": "Agence Gonfreville-L'Orcher", "adresse": "Rue de Bévilliers", "ville": "GONFREVILLE-L'ORCHER", "region": "Normandie", "lat": 49.509829, "lon": 0.215075}, {"nom": "Agence Plaisance-Du-Touch", "adresse": "4 impasse Ada Lovelace", "ville": "PLAISANCE-DU-TOUCH", "region": "Occitanie", "lat": 43.590424, "lon": 1.294748}, {"nom": "Agence Entzheim", "adresse": "7 rue des Cigognes", "ville": "ENTZHEIM", "region": "Grand Est", "lat": 48.541902, "lon": 7.648245}, {"nom": "Agence Port-De-Bouc", "adresse": "90 boulevard Merindole", "ville": "PORT-DE-BOUC", "region": "Provence-Alpes-Côte d'Azur", "lat": 43.419903, "lon": 4.983162}, {"nom": "Agence Latresne", "adresse": "1 avenue de la Libération", "ville": "LATRESNE", "region": "Nouvelle-Aquitaine", "lat": 44.782154, "lon": -0.495328}, {"nom": "Agence Niort", "adresse": "23 rue Martin Luther King", "ville": "NIORT", "region": "Nouvelle-Aquitaine", "lat": 46.335885, "lon": -0.404427}, {"nom": "Agence Grenoble", "adresse": "73 rue du Général Mangin", "ville": "GRENOBLE", "region": "Auvergne-Rhône-Alpes", "lat": 45.168519, "lon": 5.714902}, {"nom": "Agence Ouzouer-Sur-Loire", "adresse": "ZA de la Jouanne", "ville": "OUZOUER-SUR-LOIRE", "region": "Centre-Val de Loire", "lat": 47.776688, "lon": 2.4865}, {"nom": "Agence Saint-Martin-Sur-Le-Pré", "adresse": "33 rue des Dâts", "ville": "SAINT-MARTIN-SUR-LE-PRÉ", "region": "Grand Est", "lat": 48.979473, "lon": 4.346972}, {"nom": "Agence Avoine", "adresse": "Rue Gustave Eiffel", "ville": "AVOINE", "region": "Centre-Val de Loire", "lat": 47.219381, "lon": 0.165964}, {"nom": "Agence Martin-Église", "adresse": "EUROCHANNEL - Parc régional d'activités", "ville": "MARTIN-ÉGLISE", "region": "Normandie", "lat": 49.8972, "lon": 1.1058}];
+
+const FUEL_NAMES = {gazole:'Diesel',sp95:'SP95',e10:'E10',sp98:'SP98',e85:'E85',gplc:'GPLc'};
+
+// Agences chargées dynamiquement via le bouton CSV
+const CLIENT_CONFIG = { name: "Client", agences: [] };
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let map, currentNetwork = 'qivia', routeLayer = null, selectedBrands = new Set();
+let stationCluster = null, agenceLayer = null;
+let allMarkers = [];
+let currentGeoFilter = {region:'', dept:''};
+let currentFuelFilter = '';
+
+// ═══════════════════════════════════════
+// INIT MAP
+// ═══════════════════════════════════════
+function initMap() {
+  map = L.map('map', {center:[46.5,2.3],zoom:6,zoomControl:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap',maxZoom:19
+  }).addTo(map);
+
+  // Set logos - with null checks
+  const lq = document.getElementById('logo-qivia-tab');
+  const ld = document.getElementById('logo-dkv-tab');
+  const lt = document.getElementById('logo-total-tab');
+  if(lq) lq.src = LOGOS.qivia || '';
+  if(ld) ld.src = LOGOS.dkv || '';
+  if(lt) lt.src = LOGOS.total || BRAND_IMGS.totalenergies || '';
+
+  // Fill geo selects
+  fillGeoSelects();
+  buildBrandPills();
+
+  // Draw markers
+  drawMarkers();
+  drawAgences();
+
+  // Search
+  document.getElementById('search-input').addEventListener('input', onSearch);
+  document.getElementById('search-input').addEventListener('keydown', e => {
+    if(e.key === 'Enter') geocodeSearch();
+  });
+}
+
+// ═══════════════════════════════════════
+// GEO FILTERS
+// ═══════════════════════════════════════
+function fillGeoSelects() {
+  const allData = [...QIVIA_DATA, ...DKV_DATA, ...TOTAL_DATA];
+  const regions = [...new Set(allData.map(s=>s.region).filter(Boolean))].sort();
+  const depts   = [...new Set(allData.map(s=>s.department).filter(Boolean))].sort();
+  // region-select removed
+  // dept-select removed
+}
+
+function applyGeoFilter() {
+  currentGeoFilter.region = '';
+  currentGeoFilter.dept   = '';
+  currentFuelFilter       = document.getElementById('fuel-select').value;
+  drawMarkers();
+}
+
+function filterStation(s) {
+  if(currentGeoFilter.region && s.region !== currentGeoFilter.region) return false;
+  if(currentGeoFilter.dept   && s.department !== currentGeoFilter.dept) return false;
+  if(currentFuelFilter && !(s.prices && s.prices[currentFuelFilter])) return false;
+  return true;
+}
+
+// ═══════════════════════════════════════
+// NETWORK TABS
+// ═══════════════════════════════════════
+// Brands that belong to each network (for filtering)
+const BRANDS_EXTRA = ['Leclerc','Intermarché','Carrefour','Super U','Auchan','Netto','Casino','Esso','BP','Avia','Eni/Agip','Dyneff','Shell','Elan'];
+
+function setNetwork(net) {
+  currentNetwork = net;
+  selectedBrand = null;
+  document.querySelectorAll('.net-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + net).classList.add('active');
+  // Reset brand pills
+  document.querySelectorAll('.brand-pill').forEach(p => p.classList.remove('active'));
+  drawMarkers();
+}
+
+function setBrand(brand) {
+  if(selectedBrands.has(brand)) {
+    selectedBrands.delete(brand);
+    document.querySelector(`.brand-pill[data-brand="${brand}"]`).classList.remove('active');
+  } else {
+    selectedBrands.add(brand);
+    document.querySelector(`.brand-pill[data-brand="${brand}"]`).classList.add('active');
+  }
+  if(selectedBrands.size > 0) {
+    document.querySelectorAll('.net-tab').forEach(t => t.classList.remove('active'));
+    currentNetwork = 'qivia';
+  }
+  drawMarkers();
+}
+
+function getBrandImgSrc(brand) {
+  const key = BRAND_LOGO_MAP[(brand||'').toLowerCase().trim()];
+  return key && BRAND_IMGS[key] ? BRAND_IMGS[key] : null;
+}
+
+function buildBrandPills() {
+  const wrap = document.getElementById('brand-pills');
+  if(!wrap) return;
+  wrap.innerHTML = BRANDS_EXTRA.map(b =>
+    `<button class="brand-pill" data-brand="${b}" onclick="setBrand('${b}')">${b}</button>`
+  ).join('');
+}
+
+
+// ═══════════════════════════════════════
+// MARKERS
+// ═══════════════════════════════════════
+function getStationIcon(station, network, opacity=1) {
+  const brandKey = (station.brand||'').toLowerCase().trim();
+  const imgKey   = BRAND_LOGO_MAP[brandKey];
+  const imgSrc   = imgKey && BRAND_IMGS[imgKey] ? BRAND_IMGS[imgKey] : null;
+  const size = 28;
+  const html = imgSrc
+    ? `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#fff;border:2px solid ${getNetColor(network)};display:flex;align-items:center;justify-content:center;padding:3px;opacity:${opacity};box-shadow:0 2px 6px rgba(0,0,0,.3)"><img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain"></div>`
+    : `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${getNetColor(network)};border:2px solid #fff;opacity:${opacity};box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>`;
+  return L.divIcon({html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2], popupAnchor:[0,-size/2]});
+}
+
+function getNetColor(net) {
+  return net==='qivia'?'#00C48C':net==='dkv'?'#F97316':net==='total'?'#EF4444':'#6366F1';
+}
+
+function getNetLabel(net) {
+  return net==='qivia'?'Qivia':net==='dkv'?'DKV':net==='total'?'TotalEnergies':'';
+}
+
+function getNetworks(station) {
+  const nets = [];
+  if(QIVIA_DATA.some(s=>s.lat===station.lat&&s.lon===station.lon)) nets.push('qivia');
+  if(DKV_DATA.some(s=>s.lat===station.lat&&s.lon===station.lon)) nets.push('dkv');
+  if(TOTAL_DATA.some(s=>s.lat===station.lat&&s.lon===station.lon)) nets.push('total');
+  return nets;
+}
+
+function getNetworksForStation(s) {
+  const result = [];
+  const isQivia = QIVIA_DATA.some(q=>q.lat===s.lat&&q.lon===s.lon);
+  const isDKV   = DKV_DATA.some(d=>d.lat===s.lat&&d.lon===s.lon);
+  const isTotal = TOTAL_DATA.some(t=>t.lat===s.lat&&t.lon===s.lon);
+  if(isQivia) result.push({type:'qivia', label:'Qivia'});
+  if(isDKV)   result.push({type:'dkv',   label:'DKV'});
+  if(isTotal) result.push({type:'total', label:'TotalEnergies'});
+  // Add brand network if not already covered
+  const brand = (s.brand||'').toLowerCase();
+  if(brand && brand!=='nan' && brand!=='autre') {
+    const brandNet = getBrandNetLabel(s.brand);
+    if(brandNet && !result.find(r=>r.label===brandNet))
+      result.push({type:'brand', label:brandNet});
+  }
+  return result;
+}
+
+function getBrandNetLabel(brand) {
+  const b = (brand||'').toLowerCase();
+  const networks = {
+    'leclerc':'Leclerc','intermarché':'Intermarché','intermarche':'Intermarché',
+    'carrefour':'Carrefour','super u':'Super U','auchan':'Auchan',
+    'netto':'Netto','casino':'Casino','esso':'Esso','bp':'BP',
+    'avia':'Avia','eni/agip':'Eni/Agip','dyneff':'Dyneff','shell':'Shell','elan':'Elan'
+  };
+  return networks[b] || null;
+}
+
+function buildPricesHtml(prices) {
+  if(!prices) return '';
+  return Object.entries(prices).filter(([k,v])=>v!=null&&v!==0).map(([k,v])=>
+    `<div class="price-chip"><span class="fuel">${FUEL_NAMES[k]||k} </span><span class="val">${parseFloat(v).toFixed(3)} €</span></div>`
+  ).join('');
+}
+
+function buildPopup(s, network) {
+  const brandKey = (s.brand||'').toLowerCase().trim();
+  const imgKey   = BRAND_LOGO_MAP[brandKey];
+  const imgSrc   = imgKey && BRAND_IMGS[imgKey] ? BRAND_IMGS[imgKey] : null;
+  const logoHtml = imgSrc ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:contain">` : '⛽';
+  // Always show ALL networks this station belongs to
+  const allNets = getNetworksForStation(s);
+  const netBadges = allNets.length > 0
+    ? allNets.map(n=>`<span class="net-badge ${n.type}">${n.label}</span>`).join('')
+    : `<span class="net-badge qivia">Qivia</span>`;
+  const uid = `${s.lat}_${s.lon}`.replace(/\./g,'_');
+  // Filter prices by selected fuel if any
+  const fuelFilter = document.getElementById('fuel-select') ? document.getElementById('fuel-select').value : '';
+  const filteredPrices = fuelFilter && s.prices ? {[fuelFilter]: s.prices[fuelFilter]} : s.prices;
+  return `
+    <div>
+      <div class="popup-header">
+        <div class="popup-logo">${logoHtml}</div>
+        <div>
+          <div class="popup-title">${(!s.name||s.name==='nan'||s.name==='None') ? (s.brand||'Station') : s.name}</div>
+          <div class="popup-sub">${s.address||''} — ${s.city||''} (${s.postal||''})</div>
+        </div>
+      </div>
+      <div class="popup-network">${netBadges}</div>
+      <div class="popup-prices">${buildPricesHtml(filteredPrices)}</div>
+      <button class="route-btn" id="rbtn_${uid}" onclick="calcRoute(${s.lat},${s.lon},'${uid}')">📍 Calculer l'itinéraire depuis une agence</button>
+      <div class="route-info" id="rinfo_${uid}">
+        <div class="route-info-title">Itinéraire</div>
+        <div id="rinfo_text_${uid}"></div>
+        <div class="route-stats" id="rinfo_stats_${uid}"></div>
+      </div>
+      <button class="clear-route" id="clear_${uid}" onclick="clearRoute('${uid}')">✕ Supprimer l'itinéraire</button>
+    </div>`;
+}
+
+function drawMarkers() {
+  if(stationCluster) { map.removeLayer(stationCluster); stationCluster = null; }
+  allMarkers = [];
+
+  const datasets = {
+    qivia: QIVIA_DATA,
+    dkv: DKV_DATA,
+    total: TOTAL_DATA
+  };
+
+  stationCluster = L.markerClusterGroup({
+    maxClusterRadius: 40,
+    iconCreateFunction: function(cluster) {
+      const count = cluster.getChildCount();
+      return L.divIcon({
+        html: `<div style="background:rgba(0,196,140,.85);color:#fff;font-weight:800;font-size:12px;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3)">${count}</div>`,
+        className:'', iconSize:[36,36]
+      });
+    }
+  });
+
+  let totalShown = 0;
+  const seen = new Set();
+
+  if(selectedBrands.size > 0) {
+    // Filter by selected brands across all Qivia stations
+    QIVIA_DATA.forEach(s => {
+      if(!s.lat || !s.lon) return;
+      if(!filterStation(s)) return;
+      const sb = (s.brand||'').toLowerCase();
+      if(![...selectedBrands].some(b => sb === b.toLowerCase())) return;
+      const key = `${s.lat}_${s.lon}`;
+      if(seen.has(key)) return;
+      seen.add(key);
+      const marker = L.marker([s.lat, s.lon], {icon: getStationIcon(s, 'qivia', 1)});
+      marker.bindPopup(buildPopup(s, 'qivia'), {maxWidth:300});
+      stationCluster.addLayer(marker);
+      allMarkers.push(marker);
+      totalShown++;
+    });
+  } else {
+    const nets = [currentNetwork];
+    nets.forEach(net => {
+      const data = datasets[net];
+      data.forEach(s => {
+        if(!s.lat || !s.lon) return;
+        if(!filterStation(s)) return;
+        const key = `${s.lat}_${s.lon}`;
+        if(seen.has(key)) return;
+        seen.add(key);
+        const marker = L.marker([s.lat, s.lon], {icon: getStationIcon(s, net, 1)});
+        marker.bindPopup(buildPopup(s, currentNetwork), {maxWidth:300});
+        stationCluster.addLayer(marker);
+        allMarkers.push(marker);
+        totalShown++;
+      });
+    });
+  }
+
+  map.addLayer(stationCluster);
+  document.getElementById('cnt-stations').textContent = totalShown.toLocaleString('fr-FR');
+}
+
+// ═══════════════════════════════════════
+// AGENCES
+// ═══════════════════════════════════════
+function getAgenceIcon() {
+  return L.divIcon({
+    html: `<div style="width:32px;height:32px;border-radius:8px;background:#2D6BE4;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.4);font-size:16px">🏢</div>`,
+    className:'', iconSize:[32,32], iconAnchor:[16,16], popupAnchor:[0,-16]
+  });
+}
+
+function drawAgences() {
+  if(agenceLayer) { map.removeLayer(agenceLayer); }
+  agenceLayer = L.layerGroup();
+  CLIENT_CONFIG.agences.forEach(a => {
+    const m = L.marker([a.lat, a.lon], {icon: getAgenceIcon(), zIndexOffset: 1000});
+    m.bindPopup(`
+      <div class="agence-popup">
+        <div class="popup-header">
+          <div class="popup-logo agence-logo">🏢</div>
+          <div>
+            <div class="popup-title">${a.nom}</div>
+            <div class="popup-sub">${a.adresse} — ${a.ville}</div>
+          </div>
+        </div>
+        <div style="font-size:.75rem;color:var(--muted);margin-top:4px">📍 ${a.region||''}</div>
+      </div>`, {maxWidth:280});
+    agenceLayer.addLayer(m);
+  });
+  agenceLayer.addTo(map);
+  document.getElementById('cnt-agences').textContent = CLIENT_CONFIG.agences.length;
+}
+
+// ═══════════════════════════════════════
+// ROUTING
+// ═══════════════════════════════════════
+async function calcRoute(lat, lon, uid) {
+  const btn = document.getElementById('rbtn_' + uid);
+  const info = document.getElementById('rinfo_' + uid);
+  const clearBtn = document.getElementById('clear_' + uid);
+  btn.disabled = true;
+  btn.textContent = '⏳ Calcul en cours…';
+
+  // Find nearest agence
+  let nearest = null, minDist = Infinity;
+  CLIENT_CONFIG.agences.forEach(a => {
+    const d = Math.sqrt((a.lat-lat)**2 + (a.lon-lon)**2);
+    if(d < minDist) { minDist = d; nearest = a; }
+  });
+  if(!nearest) { btn.disabled=false; btn.textContent='📍 Calculer itinéraire'; return; }
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${nearest.lon},${nearest.lat};${lon},${lat}?overview=full&geometries=geojson`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if(d.routes && d.routes[0]) {
+      const route = d.routes[0];
+      const km = (route.distance/1000).toFixed(1);
+      const min = Math.round(route.duration/60);
+      const h = Math.floor(min/60), m = min%60;
+      const durStr = h > 0 ? `${h}h${m.toString().padStart(2,'0')}` : `${m} min`;
+
+      if(routeLayer) map.removeLayer(routeLayer);
+      routeLayer = L.geoJSON(route.geometry, {style:{color:'#2D6BE4',weight:4,opacity:.8}}).addTo(map);
+      map.fitBounds(routeLayer.getBounds(), {padding:[40,40]});
+
+      if(info) info.style.display = '';
+      if(clearBtn) clearBtn.style.display = '';
+      document.getElementById('rinfo_text_' + uid).textContent = `Depuis: ${nearest.nom} (${nearest.ville})`;
+      document.getElementById('rinfo_stats_' + uid).innerHTML = `
+        <div class="route-stat"><span>${km} km</span><span>Distance</span></div>
+        <div class="route-stat"><span>${durStr}</span><span>Durée</span></div>`;
+    }
+  } catch(e) {
+    info.style.display = '';
+    document.getElementById('rinfo_text_' + uid).textContent = `Erreur de calcul d'itinéraire`;
+  }
+  btn.disabled = false;
+  btn.textContent = '📍 Recalculer';
+}
+
+function clearRoute(uid) {
+  if(routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  document.getElementById('rinfo_' + uid).style.display = 'none';
+  document.getElementById('clear_' + uid).style.display = 'none';
+  document.getElementById('rbtn_' + uid).textContent = `📍 Calculer l'itinéraire depuis une agence`;
+}
+
+// ═══════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════
+let searchTimeout;
+function onSearch() {
+  clearTimeout(searchTimeout);
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  const ac = document.getElementById('autocomplete');
+  if(q.length < 2) { ac.style.display='none'; return; }
+  searchTimeout = setTimeout(() => {
+    const allData = currentNetwork==='all'
+      ? [...QIVIA_DATA,...DKV_DATA,...TOTAL_DATA]
+      : (currentNetwork==='qivia'?QIVIA_DATA:currentNetwork==='dkv'?DKV_DATA:TOTAL_DATA);
+    const matches = [];
+    const cities = new Map();
+    allData.forEach(s => {
+      const city = (s.city||'').toLowerCase();
+      const dept = (s.department||'').toLowerCase();
+      const region = (s.region||'').toLowerCase();
+      if((city.includes(q)||dept.includes(q)||region.includes(q)) && !cities.has(city)) {
+        cities.set(city, s);
+        matches.push(s);
+      }
+    });
+    const top = matches.slice(0,8);
+    if(!top.length) { ac.style.display='none'; return; }
+    ac.innerHTML = top.map(s=>`
+      <div class="ac-item" onclick="gotoCity(${s.lat},${s.lon},'${(s.city||'').replace(/'/g,"\'")}')">
+        ${s.city||''}
+        <small>${s.department||''} — ${s.region||''}</small>
+      </div>`).join('');
+    ac.style.display = '';
+  }, 200);
+}
+
+function gotoCity(lat, lon, city) {
+  if(boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+  map.setView([lat, lon], 12);
+  document.getElementById('search-input').value = city;
+  document.getElementById('autocomplete').style.display = 'none';
+}
+
+let boundaryLayer = null;
+
+async function geocodeSearch() {
+  const q = document.getElementById('search-input').value.trim();
+  if(!q) return;
+  document.getElementById('autocomplete').style.display = 'none';
+
+  // Remove previous boundary
+  if(boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+
+  try {
+    // 1. Search location
+    const searchUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q+' France')}&format=json&limit=1&polygon_geojson=1`;
+    const r = await fetch(searchUrl, {headers:{'Accept-Language':'fr'}});
+    const data = await r.json();
+
+    if(data && data[0]) {
+      const result = data[0];
+      const lat = parseFloat(result.lat);
+      const lon = parseFloat(result.lon);
+
+      // 2. Draw boundary if polygon available
+      if(result.geojson && (result.geojson.type === 'Polygon' || result.geojson.type === 'MultiPolygon')) {
+        boundaryLayer = L.geoJSON(result.geojson, {
+          style: {
+            color: '#2D6BE4',
+            weight: 2.5,
+            opacity: 0.9,
+            fillColor: '#2D6BE4',
+            fillOpacity: 0.06,
+            dashArray: '6,4'
+          }
+        }).addTo(map);
+        map.fitBounds(boundaryLayer.getBounds(), {padding: [30,30]});
+        const cb = document.getElementById('clear-boundary');
+        if(cb) cb.style.display = '';
+      } else {
+        map.setView([lat, lon], 11);
+      }
+    }
+  } catch(e) {
+    // fallback: search in stations data
+    const q2 = q.toLowerCase();
+    const found = [...QIVIA_DATA,...DKV_DATA,...TOTAL_DATA].find(s =>
+      (s.city||'').toLowerCase().includes(q2) ||
+      (s.department||'').toLowerCase().includes(q2) ||
+      (s.region||'').toLowerCase().includes(q2)
+    );
+    if(found) map.setView([found.lat, found.lon], 10);
+  }
+}
+
+function clearBoundary() {
+  if(boundaryLayer) { map.removeLayer(boundaryLayer); boundaryLayer = null; }
+  document.getElementById('search-input').value = '';
+  const cb = document.getElementById('clear-boundary');
+  if(cb) cb.style.display = 'none';
+}
+
+document.addEventListener('click', e => {
+  if(!e.target.closest('#search-input') && !e.target.closest('#autocomplete'))
+    document.getElementById('autocomplete').style.display = 'none';
+});
+
+// ═══════════════════════════════════════
+// START
+// ═══════════════════════════════════════
+window.addEventListener('load', () => {
+  initMap();
+});
+
+
+// ════════════════════════════════════════
+// ITINERARY — CLEAN REWRITE
+// ════════════════════════════════════════
+let riLayer = null;
+let riTimers = {};
+let riCoords = {from: null, to: null};
+
+function toggleRoute() {
+  const form = document.getElementById('route-form');
+  form.style.display = form.style.display === 'none' ? '' : 'none';
+}
+
+function riSwap() {
+  const a = document.getElementById('ri-from');
+  const b = document.getElementById('ri-to');
+  [a.value, b.value] = [b.value, a.value];
+  [riCoords.from, riCoords.to] = [riCoords.to, riCoords.from];
+}
+
+async function riAutoComplete(which) {
+  const q = document.getElementById(`ri-${which}`).value.trim();
+  const ac = document.getElementById(`ri-ac-${which}`);
+  riCoords[which] = null;
+  if (q.length < 2) { ac.style.display = 'none'; return; }
+  clearTimeout(riTimers[which]);
+  riTimers[which] = setTimeout(async () => {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ' France')}&format=json&limit=5`, { headers: { 'Accept-Language': 'fr' } });
+      const data = await r.json();
+      if (!data.length) { ac.style.display = 'none'; return; }
+      ac.innerHTML = data.map(d =>
+        `<div onclick="riSelect('${which}',${d.lat},${d.lon},'${d.display_name.split(',').slice(0,2).join(',').replace(/'/g,"\'")}' )"
+          style="padding:7px 10px;font-size:.73rem;color:rgba(255,255,255,.85);cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06);"
+          onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background=''"
+        >${d.display_name.split(',').slice(0, 3).join(', ')}</div>`
+      ).join('');
+      ac.style.display = '';
+    } catch(e) { ac.style.display = 'none'; }
+  }, 300);
+}
+
+function riSelect(which, lat, lon, name) {
+  riCoords[which] = { lat: parseFloat(lat), lon: parseFloat(lon) };
+  document.getElementById(`ri-${which}`).value = name;
+  document.getElementById(`ri-ac-${which}`).style.display = 'none';
+}
+
+async function riGeocode(which) {
+  if (riCoords[which]) return riCoords[which];
+  const val = document.getElementById(`ri-${which}`).value.trim();
+  if (!val) return null;
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val + ' France')}&format=json&limit=1`, { headers: { 'Accept-Language': 'fr' } });
+    const d = await r.json();
+    if (d[0]) { riCoords[which] = { lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon) }; return riCoords[which]; }
+  } catch(e) {}
+  return null;
+}
+
+async function calcRoute() {
+  const btn = document.getElementById('ri-go');
+  btn.textContent = '⏳ Calcul…';
+  btn.disabled = true;
+
+  const from = await riGeocode('from');
+  const to   = await riGeocode('to');
+
+  if (!from || !to) {
+    btn.textContent = 'Calculer';
+    btn.disabled = false;
+    alert('Veuillez entrer un départ et une arrivée valides.');
+    return;
+  }
+
+  // Remove previous route
+  if (riLayer) { map.removeLayer(riLayer); riLayer = null; }
+
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=full&geometries=geojson`;
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.code === 'Ok' && data.routes[0]) {
+      const route = data.routes[0];
+      const km = (route.distance / 1000).toFixed(1);
+      const totalMin = Math.round(route.duration / 60);
+      const h = Math.floor(totalMin / 60), m = totalMin % 60;
+      const dur = h > 0 ? `${h}h${String(m).padStart(2,'0')}` : `${totalMin} min`;
+
+      riLayer = L.geoJSON(route.geometry, { style: { color: '#2D6BE4', weight: 5, opacity: .85 } }).addTo(map);
+      map.fitBounds(riLayer.getBounds(), { padding: [50, 50] });
+
+      document.getElementById('ri-dist').textContent = km + ' km';
+      document.getElementById('ri-dur').textContent = dur;
+    } else {
+      throw new Error('no route');
+    }
+  } catch(e) {
+    // Straight-line fallback
+    const dx = (to.lon - from.lon) * 111 * Math.cos(from.lat * Math.PI / 180);
+    const dy = (to.lat - from.lat) * 111;
+    const km = (Math.sqrt(dx*dx + dy*dy) * 1.3).toFixed(1);
+    const totalMin = Math.round(parseFloat(km) / 80 * 60);
+    const h = Math.floor(totalMin / 60), m = totalMin % 60;
+    const dur = h > 0 ? `${h}h${String(m).padStart(2,'0')}` : `${totalMin} min`;
+
+    riLayer = L.polyline([[from.lat, from.lon], [to.lat, to.lon]], { color: '#F97316', weight: 3, dashArray: '8,5' }).addTo(map);
+    map.fitBounds([[from.lat, from.lon], [to.lat, to.lon]], { padding: [60, 60] });
+
+    document.getElementById('ri-dist').textContent = '~' + km + ' km';
+    document.getElementById('ri-dur').textContent = '~' + dur;
+  }
+
+  document.getElementById('ri-result').style.display = 'block';
+  btn.textContent = 'Recalculer';
+  btn.disabled = false;
+}
+
+function clearRoute() {
+  if (riLayer) { map.removeLayer(riLayer); riLayer = null; }
+  document.getElementById('ri-from').value = '';
+  document.getElementById('ri-to').value = '';
+  document.getElementById('ri-result').style.display = 'none';
+  document.getElementById('ri-go').textContent = 'Calculer';
+  riCoords = { from: null, to: null };
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#ri-from') && !e.target.closest('#ri-ac-from'))
+    document.getElementById('ri-ac-from').style.display = 'none';
+  if (!e.target.closest('#ri-to') && !e.target.closest('#ri-ac-to'))
+    document.getElementById('ri-ac-to').style.display = 'none';
+});
+
+
+// ═══════════════════════════════════════
+// CSV AGENCES IMPORT
+// ═══════════════════════════════════════
+async function geocodeAddress(address) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address+', France')}&format=json&limit=1`;
+    const r = await fetch(url, {headers:{'Accept-Language':'fr'}});
+    const d = await r.json();
+    if(d && d[0]) return {lat: parseFloat(d[0].lat), lon: parseFloat(d[0].lon)};
+  } catch(e) {}
+  return null;
+}
+
+function loadAgencesCSV(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+    // Skip header if it looks like one
+    const start = (lines[0].toLowerCase().includes('nom') || lines[0].toLowerCase().includes('name')) ? 1 : 0;
+    const rows = lines.slice(start);
+
+    if(!rows.length) return;
+
+    // Show loading modal
+    showCSVModal(rows.length);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function showCSVModal(count) {
+  const modal = document.createElement('div');
+  modal.className = 'csv-modal-bg';
+  modal.id = 'csv-modal';
+  modal.innerHTML = `
+    <div class="csv-modal">
+      <h3>📂 Importer les agences</h3>
+      <p>${count} agence(s) détectée(s). Le fichier doit être au format :<br>
+      <strong style="color:#fff">Nom,Adresse</strong> (une ligne par agence)</p>
+      <pre>Agence Paris,12 rue de la Paix Paris
+Agence Lyon,5 place Bellecour Lyon</pre>
+      <div id="csv-progress" style="color:rgba(255,255,255,.5);font-size:.75rem;margin-bottom:8px;display:none">⏳ Géocodage en cours…</div>
+      <div class="csv-error" id="csv-error"></div>
+      <div class="csv-modal-btns">
+        <button class="csv-modal-btn csv-modal-cancel" onclick="closeCSVModal()">Annuler</button>
+        <button class="csv-modal-btn csv-modal-ok" id="csv-modal-ok" onclick="processCSV()">Importer</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function closeCSVModal() {
+  const m = document.getElementById('csv-modal');
+  if(m) m.remove();
+  document.getElementById('csv-input').value = '';
+}
+
+async function processCSV() {
+  const input = document.getElementById('csv-input');
+  const file = input.files[0];
+  if(!file) return;
+
+  const btn = document.getElementById('csv-modal-ok');
+  const prog = document.getElementById('csv-progress');
+  btn.disabled = true;
+  btn.textContent = '⏳ En cours…';
+  prog.style.display = '';
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+    const start = (lines[0].toLowerCase().includes('nom') || lines[0].toLowerCase().includes('name')) ? 1 : 0;
+    const rows = lines.slice(start);
+
+    const agences = [];
+    for(let i=0; i<rows.length; i++) {
+      prog.textContent = `⏳ Géocodage ${i+1}/${rows.length}…`;
+      const parts = rows[i].split(',');
+      const nom = (parts[0]||'').trim();
+      const adresse = parts.slice(1).join(',').trim();
+      if(!nom) continue;
+
+      // Try geocoding
+      const coords = await geocodeAddress(adresse || nom);
+      if(coords) {
+        agences.push({nom, adresse, ville: '', region: '', lat: coords.lat, lon: coords.lon});
+      } else {
+        agences.push({nom, adresse, ville: '', region: '', lat: null, lon: null});
+      }
+      // Small delay to respect Nominatim rate limit
+      await new Promise(r => setTimeout(r, 1100));
+    }
+
+    const valid = agences.filter(a=>a.lat!==null);
+    const invalid = agences.filter(a=>a.lat===null);
+
+    CLIENT_CONFIG.agences = valid;
+    drawAgences();
+
+    if(invalid.length) {
+      document.getElementById('csv-error').style.display = '';
+      document.getElementById('csv-error').textContent = `⚠️ ${invalid.length} adresse(s) non trouvée(s): ${invalid.map(a=>a.nom).join(', ')}`;
+    }
+
+    document.getElementById('csv-clear-btn').style.display = '';
+    setTimeout(closeCSVModal, 1500);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function clearAgences() {
+  CLIENT_CONFIG.agences = [];
+  if(agenceLayer) { map.removeLayer(agenceLayer); agenceLayer = null; }
+  document.getElementById('cnt-agences').textContent = '0';
+  document.getElementById('csv-clear-btn').style.display = 'none';
+  document.getElementById('csv-input').value = '';
+}
+</script>
+<script>
+function toggleNav(){
+  document.getElementById('nav-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest('.nav-wrap'))
+    document.getElementById('nav-dropdown') && document.getElementById('nav-dropdown').classList.remove('open');
+});
+
+</script>
+</body>
+</html>
