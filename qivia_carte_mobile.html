@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Carte — Qivia</title>
+<script>if(sessionStorage.getItem('qivia_auth')!=='1'){ sessionStorage.setItem('qivia_dest','qivia_mobile.html'); window.location.replace('index.html'); }</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0D1117;--green:#00C48C;--muted:#6E7A8A;--border:#E4E8EF;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;width:100%;overflow:hidden;font-family:'Inter',sans-serif;background:#E8EAED;}
+#map{position:absolute;inset:0;}
+.leaflet-control-attribution{display:none!important;}
+
+/* Panneau de filtres — affiché quand body.qf-open (bouton Filtres de la coque) */
+#panel{position:absolute;top:0;left:0;right:0;z-index:1000;background:#fff;border-bottom:1px solid var(--border);
+  box-shadow:0 6px 20px rgba(0,0,0,.12);padding:10px 12px 12px;display:none;max-height:78%;overflow-y:auto;}
+body.qf-open #panel{display:block;}
+
+.seg{display:flex;background:#EEF1F5;border-radius:11px;padding:3px;gap:3px;margin-bottom:10px;}
+.seg button{flex:1;border:0;background:none;padding:9px 0;border-radius:9px;font-family:inherit;font-size:.85rem;font-weight:700;color:var(--muted);cursor:pointer;}
+.seg button.on{background:#fff;color:#0D1117;box-shadow:0 1px 3px rgba(0,0,0,.12);}
+
+.f-label{font-size:.6rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:8px 2px 5px;}
+.zrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px;}
+.zrow select,.fuelsel{width:100%;height:38px;border:1.5px solid var(--border);border-radius:9px;padding:0 10px;font-family:inherit;font-size:.82rem;background:#fff;color:#0D1117;}
+
+/* Boutons réseau / enseigne, même taille, compteur au-dessus */
+.netgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+.netgrid.elec{grid-template-columns:repeat(3,1fr);}
+.netbtn{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
+.netbtn .cnt{font-size:.72rem;font-weight:800;color:#0D1117;line-height:1;min-height:.8em;}
+.netbtn .b{width:100%;height:42px;border:1.5px solid var(--border);border-radius:11px;background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:.66rem;font-weight:700;color:var(--muted);text-align:center;padding:2px;line-height:1.05;transition:.12s;}
+.netbtn.on .b{border-width:2px;}
+.netbtn .b small{font-size:.9em;}
+
+.search{display:flex;gap:6px;margin-top:10px;}
+.search input{flex:1;height:38px;border:1.5px solid var(--border);border-radius:9px;padding:0 12px;font-family:inherit;font-size:.85rem;}
+.search button{height:38px;padding:0 14px;border:0;border-radius:9px;background:var(--green);color:#0D1117;font-weight:700;font-family:inherit;font-size:.82rem;cursor:pointer;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;}
+.chip{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;}
+.chip .cnt{font-size:.62rem;font-weight:800;color:#0D1117;}
+.chip .b{border:1.5px solid var(--border);border-radius:18px;padding:6px 11px;font-size:.72rem;font-weight:600;color:var(--muted);background:#fff;white-space:nowrap;}
+.chip.on .b{border-width:2px;}
+
+/* Compteur flottant (toujours visible) */
+#count-fab{position:absolute;bottom:calc(14px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:1000;
+  background:#0D1117;color:#fff;border-radius:22px;padding:8px 16px;font-size:.78rem;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.35);white-space:nowrap;}
+#count-fab b{color:var(--green);}
+
+#loader{position:absolute;inset:0;z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#0D1117;}
+#loader.hide{display:none;}
+#loader .lq{width:46px;height:46px;border-radius:12px;background:var(--green);display:flex;align-items:center;justify-content:center;color:#0D1117;font-size:1.3rem;font-weight:800;}
+#loader .lt{color:#fff;font-size:.9rem;font-weight:600;}
+.pop b{font-size:.86rem;}.pop .row{font-size:.78rem;color:#444;margin-top:2px;}.pop .pr{color:#00785a;font-weight:700;}
+.leaflet-popup-content{margin:12px 14px;min-width:190px;max-width:80vw;}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="panel">
+  <div class="seg">
+    <button id="seg-fuel" class="on" onclick="setMode('fuel')">&#9981; Carburant</button>
+    <button id="seg-elec" onclick="setMode('elec')">&#9889; &Eacute;lectrique</button>
+  </div>
+
+  <div class="f-label">Zone g&eacute;ographique</div>
+  <div class="zrow">
+    <select id="sel-region" onchange="onRegion()"><option value="">Toutes r&eacute;gions</option></select>
+    <select id="sel-dept" onchange="onDept()"><option value="">Tous d&eacute;partements</option></select>
+  </div>
+
+  <!-- FUEL -->
+  <div id="block-fuel">
+    <div class="f-label">R&eacute;seau &amp; enseigne</div>
+    <div class="netgrid" id="netgrid"></div>
+    <div class="f-label">Carburant (prix / couleur)</div>
+    <select class="fuelsel" id="sel-fuel" onchange="onFuelType()">
+      <option value="">Tous</option><option value="gazole">Gazole</option><option value="sp95">SP95</option>
+      <option value="e10">E10</option><option value="sp98">SP98</option><option value="e85">E85</option><option value="gplc">GPLc</option>
+    </select>
+  </div>
+
+  <!-- ELEC -->
+  <div id="block-elec" style="display:none">
+    <div class="f-label">Puissance</div>
+    <div class="chips" id="powchips"></div>
+    <div class="f-label">Op&eacute;rateur</div>
+    <select class="fuelsel" id="sel-op" onchange="onOperator()"><option value="">Tous les op&eacute;rateurs</option></select>
+  </div>
+
+  <div class="search">
+    <input id="addr" placeholder="Rechercher une adresse, ville&hellip;" onkeydown="if(event.key==='Enter')geocode()">
+    <button onclick="geocode()">Aller</button>
+  </div>
+</div>
+
+<div id="count-fab">&hellip;</div>
+
+<div id="loader"><div class="lq">Q</div><div class="lt">Chargement de la carte&hellip;</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script>
+const FUEL_URL='stations_lite.geojson', EV_URL='bornes_lite.geojson';
+const NETS=[
+  {k:'qivia',label:'Qivia',color:'#00C48C'},
+  {k:'dkv',label:'DKV',color:'#F97316'},
+  {k:'edenred',label:'Edenred',color:'#C0392B'},
+  {k:'total',label:'Total',color:'#EF4444'},
+];
+const POW=[
+  {k:'Normale',color:'#6B7280'},{k:'Accélérée',color:'#60A5FA'},{k:'Rapide',color:'#FBBF24'},
+  {k:'HPC',color:'#00E676'},{k:'Ultra-rapide',color:'#5FFFA7'},
+];
+let map, cluster;
+let fuel=[], ev=null, evLoading=false;
+let mode='fuel', curNet='qivia', curBrand='', zone={region:'',dept:''}, fuelType='';
+let powSel=new Set(), curOp='';
+let cpToDept={}, deptToRegion={};   // dérivés des données carburant
+
+function norm(c){ let x=+c; return x; }
+function decode(lng,lat){ if(Math.abs(lat)>90)lat/=1e5; if(Math.abs(lng)>180)lng/=1e5; return [lat,lng]; }
+
+function deptCode(cp){ cp=String(cp||''); if(!cp)return''; return (cp.startsWith('97')||cp.startsWith('98'))?cp.slice(0,3):cp.slice(0,2); }
+
+// ---------- Chargement carburant ----------
+async function loadFuel(){
+  const r=await fetch(FUEL_URL); const gj=await r.json();
+  fuel=(gj.features||[]).map(f=>{
+    const g=f.geometry||{},p=f.properties||{};
+    if(!Array.isArray(g.coordinates))return null;
+    const [lat,lon]=decode(g.coordinates[0],g.coordinates[1]);
+    if(!lat||!lon)return null;
+    const prices={};
+    [['gazole_prix','gazole'],['sp95_prix','sp95'],['e10_prix','e10'],['sp98_prix','sp98'],['e85_prix','e85'],['gplc_prix','gplc']]
+      .forEach(([s,d])=>{const v=parseFloat(p[s]); if(!isNaN(v)&&v>0)prices[d]=v;});
+    const dep=String(p.departement||''), reg=String(p.region||''), cp=String(p.cp||'');
+    if(cp&&dep) cpToDept[deptCode(cp)]=dep;
+    if(dep&&reg) deptToRegion[dep]=reg;
+    return {lat,lon,brand:String(p.brand||'Autre'),dkv:Number(p.dkv)===1,edenred:Number(p.edenred)===1,
+      total:Number(p.total_energies)===1,region:reg,dept:dep,ville:String(p.ville||''),cp:cp,
+      adresse:String(p.adresse||''),prices};
+  }).filter(Boolean);
+}
+
+// ---------- Chargement électrique (paresseux) ----------
+async function loadEv(){
+  if(ev||evLoading)return; evLoading=true;
+  showLoader('Chargement des bornes électriques…');
+  const r=await fetch(EV_URL); const gj=await r.json();
+  ev=(gj.features||[]).map(f=>{
+    const g=f.geometry||{},p=f.properties||{};
+    if(!Array.isArray(g.coordinates))return null;
+    const [lat,lon]=decode(g.coordinates[0],g.coordinates[1]);
+    if(!lat||!lon)return null;
+    const cp=String(p.cp||''), dep=cpToDept[deptCode(cp)]||'';
+    return {lat,lon,operateur:opName(p.operateur||p.enseigne||''),cat:String(p.categorie||''),
+      puissance:p.puissance,nb:p.nb_pdc||1,nom:String(p.nom||''),ville:String(p.ville||''),cp:cp,
+      adresse:String(p.adresse||''),dept:dep,region:deptToRegion[dep]||''};
+  }).filter(Boolean);
+  evLoading=false; hideLoader();
+}
+
+// Normalisation opérateur (regroupe casse + suffixes "| FR*...")
+function opName(s){ s=String(s||'').split('|')[0].trim(); if(!s)return 'Autre';
+  return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase(); }
+
+// ---------- Filtres / zone ----------
+function inZone(s){ if(zone.dept) return s.dept===zone.dept; if(zone.region) return s.region===zone.region; return true; }
+function fuelInNet(s,net){ return net==='qivia'?true:net==='dkv'?s.dkv:net==='edenred'?s.edenred:net==='total'?s.total:true; }
+
+function fuelFiltered(){
+  return fuel.filter(s=> inZone(s) && fuelInNet(s,curNet) && (!curBrand || s.brand===curBrand)
+    && (!fuelType || s.prices[fuelType]!=null));
+}
+function evFiltered(){
+  return (ev||[]).filter(s=> inZone(s) && (powSel.size===0||powSel.has(s.cat)) && (!curOp||s.operateur===curOp));
+}
+
+// ---------- Couleurs / marqueurs ----------
+function netColorOf(s){ if(s.dkv&&curNet==='dkv')return '#F97316'; if(s.edenred&&curNet==='edenred')return '#C0392B';
+  if(s.total&&curNet==='total')return '#EF4444'; return '#00C48C'; }
+function powColor(cat){ const p=POW.find(x=>x.k===cat); return p?p.color:'#9AA3B2'; }
+function dot(color){ return L.divIcon({className:'',iconSize:[14,14],
+  html:`<div style="width:13px;height:13px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></div>`}); }
+
+function popupFuel(s){
+  let pr=Object.entries(s.prices).map(([k,v])=>`<span class="pr">${({gazole:'Gazole',sp95:'SP95',e10:'E10',sp98:'SP98',e85:'E85',gplc:'GPLc'})[k]} ${v.toFixed(3)}€</span>`).join(' · ')||'<span style="color:#999">Prix indisponible</span>';
+  const tags=[s.dkv?'DKV':'',s.edenred?'Edenred':'',s.total?'Total':''].filter(Boolean).join(' · ');
+  return `<div class="pop"><b>${s.brand}</b><div class="row">${s.adresse}, ${s.cp} ${s.ville}</div><div class="row">${pr}</div>${tags?`<div class="row" style="color:#888">${tags}</div>`:''}</div>`;
+}
+function popupEv(s){
+  return `<div class="pop"><b>${s.nom||s.operateur}</b><div class="row">${s.operateur}</div><div class="row">${s.adresse}, ${s.cp} ${s.ville}</div><div class="row pr">${s.cat||'—'}${s.puissance?` · ${s.puissance} kW`:''} · ${s.nb} point(s)</div></div>`;
+}
+
+function draw(){
+  if(!cluster){ cluster=L.markerClusterGroup({chunkedLoading:true,maxClusterRadius:55,spiderfyOnMaxZoom:true,disableClusteringAtZoom:14}); map.addLayer(cluster); }
+  cluster.clearLayers();
+  let list, markers=[];
+  if(mode==='fuel'){
+    list=fuelFiltered();
+    for(const s of list){ markers.push(L.marker([s.lat,s.lon],{icon:dot(netColorOf(s))}).bindPopup(popupFuel(s))); }
+  } else {
+    list=evFiltered();
+    for(const s of list){ markers.push(L.marker([s.lat,s.lon],{icon:dot(powColor(s.cat))}).bindPopup(popupEv(s))); }
+  }
+  cluster.addLayers(markers);
+  document.getElementById('count-fab').innerHTML = `<b>${list.length.toLocaleString('fr-FR')}</b> ${mode==='fuel'?'stations':'bornes'}${zoneLabel()}`;
+  renderCounts();
+}
+function zoneLabel(){ if(zone.dept)return ' · '+zone.dept; if(zone.region)return ' · '+zone.region; return ''; }
+
+// ---------- Compteurs réseau / enseigne (varient selon la zone) ----------
+function renderCounts(){
+  if(mode==='fuel'){
+    const inz=fuel.filter(inZone);
+    NETS.forEach(n=>{ const el=document.getElementById('cnt-'+n.k);
+      if(el) el.textContent=inz.filter(s=>fuelInNet(s,n.k)).length.toLocaleString('fr-FR'); });
+    const be=document.getElementById('cnt-brand');
+    if(be) be.textContent = curBrand ? inz.filter(s=>fuelInNet(s,curNet)&&s.brand===curBrand).length.toLocaleString('fr-FR') : '';
+  } else {
+    const inz=(ev||[]).filter(inZone);
+    POW.forEach(p=>{ const el=document.getElementById('pc-'+p.k);
+      if(el) el.textContent=inz.filter(s=>s.cat===p.k).length.toLocaleString('fr-FR'); });
+  }
+}
+
+// ---------- UI builders ----------
+function buildNetGrid(){
+  const g=document.getElementById('netgrid'); g.classList.remove('elec'); g.innerHTML='';
+  NETS.forEach(n=>{
+    const d=document.createElement('div'); d.className='netbtn'+(curNet===n.k?' on':''); d.id='net-'+n.k;
+    d.onclick=()=>{curNet=n.k; curBrand=''; document.getElementById('brandbtn-label').textContent='Enseigne';
+      [...g.querySelectorAll('.netbtn')].forEach(x=>x.classList.remove('on')); d.classList.add('on'); draw();};
+    d.innerHTML=`<span class="cnt" id="cnt-${n.k}">…</span><span class="b" style="${curNet===n.k?`border-color:${n.color};color:${n.color}`:''}">${n.label}</span>`;
+    g.appendChild(d);
+  });
+  // bouton enseigne (même taille)
+  const b=document.createElement('div'); b.className='netbtn'; b.onclick=openBrandSheet;
+  b.innerHTML=`<span class="cnt" id="cnt-brand"></span><span class="b" id="brandbtn-label">Enseigne</span>`;
+  g.appendChild(b);
+}
+function buildPowChips(){
+  const c=document.getElementById('powchips'); c.innerHTML='';
+  POW.forEach(p=>{ const d=document.createElement('div'); d.className='chip'+(powSel.has(p.k)?' on':'');
+    d.onclick=()=>{ powSel.has(p.k)?powSel.delete(p.k):powSel.add(p.k);
+      d.classList.toggle('on'); draw(); };
+    d.innerHTML=`<span class="cnt" id="pc-${p.k}">…</span><span class="b" style="${powSel.has(p.k)?`border-color:${p.color};color:${p.color}`:''}">${p.k}</span>`;
+    c.appendChild(d); });
+}
+
+// Feuille de sélection d'enseigne
+function openBrandSheet(){
+  const inz=fuel.filter(s=>inZone(s)&&fuelInNet(s,curNet));
+  const counts={}; inz.forEach(s=>counts[s.brand]=(counts[s.brand]||0)+1);
+  const brands=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  let html=`<div style="padding:6px 2px"><div style="font-weight:800;margin-bottom:8px">Choisir une enseigne</div>`;
+  html+=`<button class="bsheet-it" data-b="">Toutes les enseignes</button>`;
+  brands.forEach(([b,n])=>{ html+=`<button class="bsheet-it" data-b="${b.replace(/"/g,'&quot;')}">${b} <span style="color:#999">(${n})</span></button>`; });
+  html+=`</div>`;
+  const ov=document.createElement('div'); ov.id='bsheet-ov';
+  ov.style.cssText='position:absolute;inset:0;z-index:3000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;';
+  ov.innerHTML=`<div style="background:#fff;width:100%;max-height:70%;overflow:auto;border-radius:18px 18px 0 0;padding:14px 16px calc(20px + env(safe-area-inset-bottom))">${html}</div>`;
+  ov.onclick=e=>{ if(e.target===ov)ov.remove(); };
+  document.body.appendChild(ov);
+  ov.querySelectorAll('.bsheet-it').forEach(btn=>{ btn.style.cssText='display:block;width:100%;text-align:left;padding:11px 8px;border:0;border-bottom:1px solid #eee;background:none;font-family:inherit;font-size:.9rem;cursor:pointer;';
+    btn.onclick=()=>{ curBrand=btn.dataset.b; document.getElementById('brandbtn-label').textContent=curBrand||'Enseigne'; ov.remove(); draw(); }; });
+}
+
+// ---------- Zone selects ----------
+function fillZones(){
+  const regions=[...new Set(fuel.map(s=>s.region).filter(Boolean))].sort();
+  const rs=document.getElementById('sel-region');
+  regions.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; rs.appendChild(o); });
+  fillDepts();
+}
+function fillDepts(){
+  const ds=document.getElementById('sel-dept'); ds.innerHTML='<option value="">Tous départements</option>';
+  let depts=fuel.filter(s=>!zone.region||s.region===zone.region).map(s=>s.dept).filter(Boolean);
+  [...new Set(depts)].sort().forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; ds.appendChild(o); });
+}
+function onRegion(){ zone.region=document.getElementById('sel-region').value; zone.dept=''; fillDepts(); draw(); }
+function onDept(){ zone.dept=document.getElementById('sel-dept').value; draw(); }
+function onFuelType(){ fuelType=document.getElementById('sel-fuel').value; draw(); }
+function onOperator(){ curOp=document.getElementById('sel-op').value; draw(); }
+
+function fillOperators(){
+  const sel=document.getElementById('sel-op'); if(sel.options.length>1)return;
+  const counts={}; (ev||[]).forEach(s=>counts[s.operateur]=(counts[s.operateur]||0)+1);
+  Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,40).forEach(([op,n])=>{
+    const o=document.createElement('option'); o.value=op; o.textContent=`${op} (${n})`; sel.appendChild(o); });
+}
+
+// ---------- Mode ----------
+async function setMode(m){
+  mode=m;
+  document.getElementById('seg-fuel').classList.toggle('on',m==='fuel');
+  document.getElementById('seg-elec').classList.toggle('on',m==='elec');
+  document.getElementById('block-fuel').style.display=m==='fuel'?'':'none';
+  document.getElementById('block-elec').style.display=m==='elec'?'':'none';
+  if(m==='elec'){ await loadEv(); fillOperators(); buildPowChips(); }
+  draw();
+}
+
+// ---------- Recherche adresse ----------
+async function geocode(){
+  const q=document.getElementById('addr').value.trim(); if(!q)return;
+  try{ const r=await fetch('https://api-adresse.data.gouv.fr/search/?limit=1&q='+encodeURIComponent(q));
+    const d=await r.json(); const f=(d.features||[])[0];
+    if(f){ const [lon,lat]=f.geometry.coordinates; map.setView([lat,lon],13); } }catch(e){}
+}
+
+function showLoader(t){ const l=document.getElementById('loader'); l.querySelector('.lt').textContent=t||'Chargement…'; l.classList.remove('hide'); }
+function hideLoader(){ document.getElementById('loader').classList.add('hide'); }
+
+// ---------- Init ----------
+(async function(){
+  map=L.map('map',{zoomControl:true,attributionControl:false}).setView([46.6,2.4],6);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
+  try{
+    await loadFuel();
+    fillZones(); buildNetGrid();
+    draw(); hideLoader();
+  }catch(e){ showLoader('Erreur de chargement des données'); console.error(e); }
+  // recalage si l'iframe s'affiche après coup
+  setTimeout(()=>map.invalidateSize(),300);
+  window.addEventListener('resize',()=>map.invalidateSize());
+})();
+</script>
+</body>
+</html>
