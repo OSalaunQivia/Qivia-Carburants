@@ -1,0 +1,44 @@
+name: Mise à jour bornes électriques
+
+# Régénère bornes_lite.geojson depuis le fichier consolidé IRVE (data.gouv.fr).
+# - automatiquement chaque jour
+# - ou manuellement depuis l'onglet "Actions" (bouton "Run workflow")
+
+on:
+  schedule:
+    - cron: "30 4 * * *"   # tous les jours à 04h30 UTC (~05h30/06h30 en France)
+  workflow_dispatch: {}
+
+permissions:
+  contents: write           # nécessaire pour committer le fichier généré
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install pandas requests
+
+      - name: Générer bornes_lite.geojson
+        run: python build_bornes.py
+
+      - name: Committer si le fichier a changé
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain bornes_lite.geojson)" ]; then
+            git add bornes_lite.geojson
+            git commit -m "MAJ bornes électriques (IRVE) — $(date -u +%Y-%m-%d)"
+            git push
+            echo "bornes_lite.geojson mis à jour et poussé."
+          else
+            echo "Aucun changement — rien à committer."
+          fi
